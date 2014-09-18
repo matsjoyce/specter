@@ -1,0 +1,29 @@
+# Little man's fibonacci, a traditional challenge. Input number of terms to display.
+INP
+STA COUNT
+
+START LDA FIRST
+OUT
+ADD SECOND
+STA TEMP
+
+LDA FIRST
+STA SECOND
+
+LDA TEMP
+STA FIRST
+
+LDA COUNT
+SUB ONE
+STA COUNT
+
+BRZ END
+BRA START
+
+END HLT
+
+FIRST DAT 0
+SECOND DAT 1
+TEMP DAT
+COUNT DAT
+ONE DAT 1

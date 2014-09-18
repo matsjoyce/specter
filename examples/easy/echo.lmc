@@ -1,0 +1,6 @@
+# Echos user input until the input == 0
+START INP
+BRZ END
+OUT
+BRA START
+END HLT
