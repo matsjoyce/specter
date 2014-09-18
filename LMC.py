@@ -83,6 +83,8 @@ def assemble(lines):
             raise SyntaxError("Invalid mnemonic at line {}:"
                               " '{}'".format(lineno + 1, instr))
         if label:
+            if label in labels:
+                raise SyntaxError("Duplicate label '{}' on lines {} and {}".format(label, lineno + 1, instrs[labels[label]][3] + 1))
             labels[label] = i
         instrs.append((instr, arg, origline, lineno))
         i += 1
