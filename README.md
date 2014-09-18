@@ -66,3 +66,13 @@ GUI Specific
  - `Run one step` -  Execute next instruction, then halt. Can be presses multiple times for "step though" effect.
  - `Reset` - Reset registers and memory. Equivalent to restarting the program.
  - `Exit` - Does what is says on the packet.
+
+Licence
+=======
+
+GPL 3 or later
+
+More Information
+===============
+
+ - https://en.wikipedia.org/wiki/Little_man_computer
