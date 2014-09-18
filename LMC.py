@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Little Man Computer simulator written in Python 3.
+# A Little Man Computer simulator written in Python 3.
 # Copyright (C) 2013  Matthew Joyce matsjoyce@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
@@ -221,7 +221,7 @@ class Runner:
 if __name__ == "__main__":
     import argparse
 
-    arg_parser = argparse.ArgumentParser(description="Little Man Computer simulator written in Python 3")
+    arg_parser = argparse.ArgumentParser(description="A Little Man Computer simulator written in Python 3")
     arg_parser.add_argument("-d", "--debug", help="debug level",
                             type=int, default=0)
     arg_parser.add_argument("-f", "--file", help="lmc file",

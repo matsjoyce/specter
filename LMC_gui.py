@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Graphical user interface written with tkinter for LMC.py
+# Graphical user interface written with tkinter for pyLMC
 # Copyright (C) 2013  Matthew Joyce matsjoyce@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
