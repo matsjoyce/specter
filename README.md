@@ -23,6 +23,8 @@ GUI
  - Have fun!
  - When the `input` field is "selected", type in a integer value between `-500` and `499` and press `Submit`.
 
+![](https://github.com/matsjoyce/pyLMC/blob/master/screenshots/screenshot.png)
+
 Examples
 ========
 
