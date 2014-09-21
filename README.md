@@ -1,7 +1,7 @@
-pyLMC
+yaplmc
 =====
 
-A Little Man Computer simulator written in Python 3
+Yet Another Python Little Man Computer written in Python 3
 
 Usage
 =====
@@ -9,21 +9,21 @@ Usage
 Command Line
 ------------
 
- - `./LMC.py`
+ - `./yaplmc.py`
  - Type in filename (or use `-f` command line flag)
  - Have fun!
 
 GUI
 ---
 
- - `./LMC_gui.py`
+ - `./yaplmc_gui.py`
  - Select file
  - Press `Run`
  - Press `Run to Halt`
  - Have fun!
  - When the `input` field is "selected", type in a integer value between `-500` and `499` and press `Submit`.
 
-![](https://github.com/matsjoyce/pyLMC/blob/master/screenshots/screenshot.png)
+![](https://github.com/matsjoyce/yaplmc/blob/master/screenshots/screenshot.png)
 
 Examples
 ========
@@ -55,7 +55,7 @@ General
 Command Line Specific
 ---------------------
 
- - Usage string: `LMC.py [-h] [-d DEBUG] [-f FILE]`
+ - Usage string: `yaplmc.py [-h] [-d DEBUG] [-f FILE]`
  - `-d` flag - Specifies debug level
    - `0` - no debug output (default)
    - `1` - low debug output
