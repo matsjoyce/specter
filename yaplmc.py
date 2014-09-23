@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-#
-# A Little Man Computer simulator written in Python 3.
-# Copyright (C) 2013  Matthew Joyce matsjoyce@gmail.com
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+Yet Another Python Little Man Computer written in Python 3
+Copyright (C) 2013  Matthew Joyce matsjoyce@gmail.com
 
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
 
 instructions = {"ADD": "1xx",
                 "SUB": "2xx",
@@ -84,7 +84,11 @@ def assemble(lines):
                               " '{}'".format(lineno + 1, instr))
         if label:
             if label in labels:
-                raise SyntaxError("Duplicate label '{}' on lines {} and {}".format(label, lineno + 1, instrs[labels[label]][3] + 1))
+                orig_line = instrs[labels[label]][3] + 1
+                raise SyntaxError("Duplicate label '{}' "
+                                  "on lines {} and {}".format(label,
+                                                              lineno + 1,
+                                                              orig_line))
             labels[label] = i
         instrs.append((instr, arg, origline, lineno))
         i += 1
@@ -124,8 +128,11 @@ class Runner:
         self.give_output = give_output if give_output else self._give_output
         self.use_input_callback = use_input_callback
         self.debug_level = debug_level
-        debug_output = debug_output if debug_output else self._debug_output
-        self.debug_output = lambda msg, level: None if level > self.debug_level else debug_output(msg)
+        self.unfiltered_debug_output = debug_output or self._debug_output
+
+    def debug_output(self, msg, level):
+        if level <= self.debug_level:
+            self.unfiltered_debug_output(msg)
 
     def cap(self, i):
         return (i + 1000) % 1000
@@ -150,13 +157,17 @@ class Runner:
         return self.rth
 
     def next_step(self, rth=False):
-        self.debug_output("Executing next instruction at {:03}".format(self.counter), DEBUG_LEVEL_HIGH)
+        self.debug_output("Executing next instruction"
+                          " at {:03}".format(self.counter), DEBUG_LEVEL_HIGH)
         instruction = self.memory[self.counter]
-        self.debug_output("Next instruction is {:03}".format(instruction), DEBUG_LEVEL_MEDIUM)
-        memory_str = ", ".join("{}: {:03}".format(i, self.memory[i]) for i in range(100))
+        self.debug_output("Next instruction is {:03}".format(instruction),
+                          DEBUG_LEVEL_MEDIUM)
+        memory_str = ", ".join("{}: {:03}".format(i, self.memory[i])
+                               for i in range(100))
         self.debug_output("Memory: {}".format(memory_str), DEBUG_LEVEL_MEDIUM)
         self.counter += 1
-        self.debug_output("Incrementing counter to {}".format(self.counter), DEBUG_LEVEL_HIGH)
+        self.debug_output("Incrementing counter to {}".format(self.counter),
+                          DEBUG_LEVEL_HIGH)
         addr = instruction % 100
         if addr > 99:
             raise RuntimeError("Invalid memory address")
@@ -168,30 +179,43 @@ class Runner:
             raise RuntimeError("Invalid instruction {:03}".format(instruction))
         elif instruction < 200:  # ADD
             value = self.cap(self.accumulator + self.memory[addr])
-            self.debug_output("ADD {:03}: accumulator = {} + {} = {}".format(addr, self.accumulator, self.memory[addr], value), DEBUG_LEVEL_LOW)
+            self.debug_output("ADD {:03}: accumulator = {} + {} = {}"
+                              .format(addr, self.accumulator,
+                                      self.memory[addr], value),
+                              DEBUG_LEVEL_LOW)
             self.accumulator = value
         elif instruction < 300:  # SUB
             value = self.cap(self.accumulator - self.memory[addr])
-            self.debug_output("SUB {:03}: accumulator = {} - {} = {}".format(addr, self.accumulator, self.memory[addr], value), DEBUG_LEVEL_LOW)
+            self.debug_output("SUB {:03}: accumulator = {} - {} = {}"
+                              .format(addr, self.accumulator,
+                                      self.memory[addr], value),
+                              DEBUG_LEVEL_LOW)
             self.accumulator = value
         elif instruction < 400:  # STA
-            self.debug_output("STA {:03}: accumulator = {}".format(addr, self.accumulator), DEBUG_LEVEL_LOW)
+            self.debug_output("STA {:03}: accumulator = {}"
+                              .format(addr, self.accumulator), DEBUG_LEVEL_LOW)
             self.memory[addr] = self.accumulator
         elif instruction < 600:  # LDA
-            self.debug_output("LDA {:03}: value = {}".format(addr, self.memory[addr]), DEBUG_LEVEL_LOW)
+            self.debug_output("LDA {:03}: value = {}"
+                              .format(addr, self.memory[addr]),
+                              DEBUG_LEVEL_LOW)
             self.accumulator = self.memory[addr]
         elif instruction < 700:  # BRA
             self.debug_output("BRA {:03}".format(addr), DEBUG_LEVEL_LOW)
             self.counter = addr
         elif instruction < 800:  # BRZ
             word = "" if self.accumulator == 0 else " no"
-            self.debug_output("BRZ {:03}: accumulator = {}, so{} branch".format(addr, self.accumulator, word), DEBUG_LEVEL_LOW)
+            self.debug_output("BRZ {:03}: accumulator = {}, so{} branch"
+                              .format(addr, self.accumulator, word),
+                              DEBUG_LEVEL_LOW)
             if self.accumulator == 0:
                 self.counter = addr
         elif instruction < 900:  # BRP
-            word = "" if self.accumulator == 0 or self.accumulator < 500 else " no"
-            self.debug_output("BRP {:03}: accumulator = {}, so{} branch".format(addr, self.accumulator, word), DEBUG_LEVEL_LOW)
-            if self.accumulator == 0 or self.accumulator < 500:
+            word = "" if self.accumulator < 500 else " no"
+            self.debug_output("BRP {:03}: accumulator = {}, so{} branch"
+                              .format(addr, self.accumulator, word),
+                              DEBUG_LEVEL_LOW)
+            if self.accumulator < 500:
                 self.counter = addr
         elif instruction == 901:  # INP
             self.debug_output("INP", DEBUG_LEVEL_LOW)
@@ -219,17 +243,28 @@ class Runner:
         self.accumulator = 0
         self.memory = self.code.copy()
 
-
 if __name__ == "__main__":
     import argparse
 
-    arg_parser = argparse.ArgumentParser(description="A Little Man Computer simulator written in Python 3")
+    arg_parser = argparse.ArgumentParser(description=__doc__.split("\n")[1],
+                                         epilog="""
+yaplmc Copyright (C) 2014  Matthew Joyce
+This program comes with ABSOLUTELY NO WARRANTY.
+This is free software, and you are welcome to redistribute it
+under certain conditions. Type `yaplmc --licence` for details.
+                                         """.strip())
     arg_parser.add_argument("-d", "--debug", help="debug level",
                             type=int, default=0)
     arg_parser.add_argument("-f", "--file", help="lmc file",
                             default=None)
+    arg_parser.add_argument("-l", "--licence", help="display licence",
+                            action="store_true")
 
     args_from_parser = arg_parser.parse_args()
+
+    if args_from_parser.licence:
+        print(__doc__.strip())
+        exit()
 
     if args_from_parser.file:
         code = open(args_from_parser.file).read().split("\n")
