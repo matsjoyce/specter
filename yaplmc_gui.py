@@ -17,6 +17,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+__author__ = "Matthew Joyce"
+__copyright__ = "Copyright 2013"
+__credits__ = ["Matthew Joyce"]
+__license__ = "GPL3"
+__version__ = "1.0.0"
+__maintainer__ = "Matthew Joyce"
+__email__ = "matsjoyce@gmail.com"
+__status__ = "Development"
+
 import tkinter
 from tkinter import filedialog as fdialog
 from tkinter import scrolledtext as stext
@@ -56,7 +65,11 @@ class MemoryDisplay(tkinter.Frame):
 class AssembleGUI:
     def __init__(self):
         self.root = tkinter.Tk()
-        code = fdialog.askopenfile().read().split("\n")
+        self.root.wm_title("yaplmc")
+        f = fdialog.askopenfile()
+        self.fname = f.name
+        self.root.wm_title("yaplmc - " + self.fname)
+        code = f.read().split("\n")
         try:
             self.code, code_length = assemble(code)
         except SyntaxError as e:
@@ -79,16 +92,15 @@ class AssembleGUI:
 
     def run(self):
         self.root.destroy()
-        r = RunGUI()
-        r.setup_runner(self.code)
+        r = RunGUI(self.code, self.fname)
         r.mainloop()
 
 
 class RunGUI:
-    def __init__(self):
+    def __init__(self, code, fname):
         self.root = tkinter.Tk()
+        self.root.wm_title("yaplmc - " + fname)
 
-    def setup_runner(self, code):
         self.getting_inp = False
         self.runner = Runner(code, get_input=self.get_input,
                              give_output=self.give_output,

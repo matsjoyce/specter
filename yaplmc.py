@@ -17,6 +17,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+__author__ = "Matthew Joyce"
+__copyright__ = "Copyright 2013"
+__credits__ = ["Matthew Joyce"]
+__license__ = "GPL3"
+__version__ = "1.0.0"
+__maintainer__ = "Matthew Joyce"
+__email__ = "matsjoyce@gmail.com"
+__status__ = "Development"
+
 instructions = {"ADD": "1xx",
                 "SUB": "2xx",
                 "STA": "3xx",
@@ -33,9 +42,10 @@ instructions = {"ADD": "1xx",
 
 def add_arg(memo, arg, lineno, line):
     instr = instructions[memo]
-    if arg and len(arg) > 2:
-        raise SyntaxError("Bad argument on line {}: '{}'".format(lineno + 1,
-                                                                 memo))
+    if arg:
+        if len(arg) > 2 or not arg.isdigit():
+            raise SyntaxError("Bad argument on line {}: '{}'"
+                              .format(lineno + 1, arg))
     if arg:
         arg = arg.zfill(2)
     if "xx" in instr:
@@ -97,6 +107,9 @@ def assemble(lines):
     for instr, arg, line, lineno in instrs:
         if instr == "DAT":
             if arg:
+                if not arg.isdigit() or not -500 <= int(arg) <= 499:
+                    raise SyntaxError("Bad argument on line {}: '{}'"
+                                      .format(lineno + 1, arg))
                 i = int(arg)
                 arg = 1000 + i if i < 0 else i
             else:
@@ -165,6 +178,10 @@ class Runner:
         memory_str = ", ".join("{}: {:03}".format(i, self.memory[i])
                                for i in range(100))
         self.debug_output("Memory: {}".format(memory_str), DEBUG_LEVEL_MEDIUM)
+        self.debug_output("Accumulator: {}".format(self.accumulator),
+                          DEBUG_LEVEL_MEDIUM)
+        self.debug_output("Counter: {}".format(self.counter),
+                          DEBUG_LEVEL_MEDIUM)
         self.counter += 1
         self.debug_output("Incrementing counter to {}".format(self.counter),
                           DEBUG_LEVEL_HIGH)
@@ -253,17 +270,23 @@ This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions. Type `yaplmc --licence` for details.
                                          """.strip())
-    arg_parser.add_argument("-d", "--debug", help="debug level",
-                            type=int, default=0)
+    arg_parser.add_argument("-d", "--debug", help="debug level"
+                            " (repeat for more info, 3 is the max)",
+                            action="count", default=0)
     arg_parser.add_argument("-f", "--file", help="lmc file",
                             default=None)
     arg_parser.add_argument("-l", "--licence", help="display licence",
+                            action="store_true")
+    arg_parser.add_argument("-V", "--version", help="display version",
                             action="store_true")
 
     args_from_parser = arg_parser.parse_args()
 
     if args_from_parser.licence:
         print(__doc__.strip())
+        exit()
+    elif args_from_parser.version:
+        print("yaplmc", __version__)
         exit()
 
     if args_from_parser.file:
@@ -278,6 +301,9 @@ under certain conditions. Type `yaplmc --licence` for details.
         print("Error:", e.args[0])
         exit(1)
     print("Assembly successful")
+    if args_from_parser.debug:
+        print("Code:")
+        print(" ".join(map(str, machine_code[:code_length])))
     print("Running...")
     runner = Runner(machine_code, debug_level=args_from_parser.debug)
     try:
