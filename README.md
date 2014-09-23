@@ -47,27 +47,7 @@ Included examples (in the `examples` folder), sorted by subjective, relative mea
 Advanced Usage
 ==============
 
-General
--------
-
- - Memory is stored in a decimalised twos-complement (`999` == `-1`, `998` == `-2`, ..., `500` == `-500`, `499` == `499`, ..., `0` == `0`)
-
-Command Line Specific
----------------------
-
- - Usage string: `yaplmc.py [-h] [-d DEBUG] [-f FILE]`
- - `-d` flag - Specifies debug level
-   - `0` - no debug output (default)
-   - `1` - low debug output
-   - `2` - medium debug output
-   - `3` or higher - high debug output
- 
-GUI Specific
-------------
-
- - `Run one step` -  Execute next instruction, then halt. Can be presses multiple times for "step though" effect.
- - `Reset` - Reset registers and memory. Equivalent to restarting the program.
- - `Exit` - Does what is says on the packet.
+See the [wiki](https://github.com/matsjoyce/yaplmc/wiki).
 
 Licence
 =======
