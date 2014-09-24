@@ -29,7 +29,7 @@ __status__ = "Development"
 import tkinter
 from tkinter import filedialog as fdialog
 from tkinter import scrolledtext as stext
-from yaplmc import Runner, assemble
+import yaplmc
 
 
 class MemoryDisplay(tkinter.Frame):
@@ -71,7 +71,7 @@ class AssembleGUI:
         self.root.wm_title("yaplmc - " + self.fname)
         code = f.read().split("\n")
         try:
-            self.code, code_length = assemble(code)
+            self.code, code_length = yaplmc.assemble(code)
         except SyntaxError as e:
             tkinter.Label(self.root, text="Assembly failed!\nError:").pack()
             t = tkinter.Text(self.root)
@@ -93,7 +93,6 @@ class AssembleGUI:
     def run(self):
         self.root.destroy()
         r = RunGUI(self.code, self.fname)
-        r.mainloop()
 
 
 class RunGUI:
@@ -102,9 +101,9 @@ class RunGUI:
         self.root.wm_title("yaplmc - " + fname)
 
         self.getting_inp = False
-        self.runner = Runner(code, get_input=self.get_input,
-                             give_output=self.give_output,
-                             use_input_callback=True)
+        self.run_to_halt = False
+        self.runner = yaplmc.Runner(code, give_output=self.give_output,
+                                    halt_for_inp=True)
 
         self.button_frame = tkinter.Frame(self.root)
         self.button_frame.grid(row=0, column=0, columnspan=2)
@@ -178,22 +177,22 @@ class RunGUI:
             self.get_input()
             return
         try:
-            cb = func()
+            ret = func()
         except RuntimeError as e:
             self.give_output("Error:\n{}".format(e.args[0]))
             return
-        if isinstance(cb, bool):
-            self.update_memory()
-            return
-        else:
-            self.inp_callback = cb
+        if ret == yaplmc.HALT_REASON_INP:
             self.get_input()
+        return ret
 
     def next_step(self):
         self.run_wrapper(self.runner.next_step)
 
     def run_to_hlt(self):
-        self.run_wrapper(self.runner.run_to_hlt)
+        self.run_to_halt = True
+        ret = self.run_wrapper(self.runner.run_to_hlt)
+        if ret == yaplmc.HALT_REASON_HLT:
+            self.run_to_halt = False
 
     def update_memory(self):
         self.memory_frame.update_memory(self.runner.memory)
@@ -220,13 +219,16 @@ class RunGUI:
         i = self.input_var.get()
         self.input_var.set("")
         self.run_to_hlt_btn.focus()
-        self.getting_inp = False
-        rth = self.inp_callback(int(i))
-        self.update_memory()
-        if rth:
-            self.run_to_hlt()
+        if self.getting_inp:
+            self.runner.give_input(int(i))
+            self.getting_inp = False
+            self.update_memory()
+            if self.run_to_halt:
+                self.run_to_hlt()
 
     def reset(self):
+        self.run_to_halt = False
+        self.getting_inp = False
         self.output.delete(1.0, tkinter.END)
         self.runner.reset()
         self.update_memory()
@@ -237,4 +239,4 @@ class RunGUI:
 
 if __name__ == "__main__":
     a = AssembleGUI()
-    a.root.mainloop()
+    tkinter.mainloop()

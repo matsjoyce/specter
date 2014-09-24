@@ -107,7 +107,8 @@ def assemble(lines):
     for instr, arg, line, lineno in instrs:
         if instr == "DAT":
             if arg:
-                if not arg.isdigit() or not -500 <= int(arg) <= 499:
+                if set(arg) - set("1234567890-") \
+                   or int(arg) not in range(-500, 500):
                     raise SyntaxError("Bad argument on line {}: '{}'"
                                       .format(lineno + 1, arg))
                 i = int(arg)
@@ -129,9 +130,13 @@ DEBUG_LEVEL_LOW = 1
 DEBUG_LEVEL_MEDIUM = 2
 DEBUG_LEVEL_HIGH = 3
 
+HALT_REASON_HLT = 0
+HALT_REASON_INP = 1
+HALT_REASON_STEP = 2
+
 
 class Runner:
-    def __init__(self, program, get_input=None, use_input_callback=False,
+    def __init__(self, program, get_input=None, halt_for_inp=False,
                  give_output=None, debug_output=None, debug_level=0):
         self.counter = 0
         self.accumulator = 0
@@ -139,7 +144,7 @@ class Runner:
         self.memory = self.code.copy()
         self.get_input = get_input if get_input else self._get_input
         self.give_output = give_output if give_output else self._give_output
-        self.use_input_callback = use_input_callback
+        self.halt_for_inp = halt_for_inp
         self.debug_level = debug_level
         self.unfiltered_debug_output = debug_output or self._debug_output
 
@@ -165,11 +170,10 @@ class Runner:
     def _debug_output(self, i):
         print(i)
 
-    def input_callback(self, i):
+    def give_input(self, i):
         self.accumulator = self.cap(i)
-        return self.rth
 
-    def next_step(self, rth=False):
+    def next_step(self):
         self.debug_output("Executing next instruction"
                           " at {:03}".format(self.counter), DEBUG_LEVEL_HIGH)
         instruction = self.memory[self.counter]
@@ -191,7 +195,7 @@ class Runner:
         if instruction == 0:  # HLT
             self.debug_output("HLT", DEBUG_LEVEL_LOW)
             self.give_output("Done! Coffee break!")
-            return True
+            return HALT_REASON_HLT
         elif instruction < 100:
             raise RuntimeError("Invalid instruction {:03}".format(instruction))
         elif instruction < 200:  # ADD
@@ -236,9 +240,8 @@ class Runner:
                 self.counter = addr
         elif instruction == 901:  # INP
             self.debug_output("INP", DEBUG_LEVEL_LOW)
-            if self.use_input_callback:
-                self.rth = rth
-                return self.input_callback
+            if self.halt_for_inp:
+                return HALT_REASON_INP
             else:
                 i = self.int_to_complement(self.get_input())
                 self.accumulator = self.cap(i)
@@ -247,12 +250,12 @@ class Runner:
             self.give_output(self.int_from_complement(self.accumulator))
         else:
             raise RuntimeError("Invalid instruction {:03}".format(instruction))
-        return False
+        return HALT_REASON_STEP
 
     def run_to_hlt(self):
-        r = None
-        while not r:
-            r = self.next_step(rth=True)
+        r = HALT_REASON_STEP
+        while r == HALT_REASON_STEP:
+            r = self.next_step()
         return r
 
     def reset(self):
