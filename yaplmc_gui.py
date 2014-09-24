@@ -30,6 +30,7 @@ import tkinter
 from tkinter import filedialog as fdialog
 from tkinter import scrolledtext as stext
 import yaplmc
+import math
 
 
 class MemoryDisplay(tkinter.Frame):
@@ -50,7 +51,8 @@ class MemoryDisplay(tkinter.Frame):
             self.memory_nums.append(mn)
 
             m = tkinter.Listbox(self, setgrid=True,
-                                height=self.per_thing, width=3)
+                                height=self.per_thing, width=3,
+                                bg="white")
             m.grid(row=1, column=i * 2 + 1, padx=5)
             self.memorys.append(m)
 
@@ -61,12 +63,34 @@ class MemoryDisplay(tkinter.Frame):
             for j in mem[self.per_thing * i:self.per_thing * (i + 1)]:
                 self.memorys[i].insert(tkinter.END, str(j).zfill(3))
 
+    def set_colors(self, mem_changed, mem_read, instr):
+        for row in range(self.rows):
+            for i in range(self.per_thing):
+                self.memory_nums[row].itemconfig(i, bg="white")
+                self.memorys[row].itemconfig(i, bg="white")
+        for i in mem_read:
+            row = math.floor(i / self.per_thing)
+            item = i % self.per_thing
+            self.memory_nums[row].itemconfig(item, bg="yellow")
+            self.memorys[row].itemconfig(item, bg="yellow")
+        for i in mem_changed:
+            row = math.floor(i / self.per_thing)
+            item = i % self.per_thing
+            self.memory_nums[row].itemconfig(item, bg="red")
+            self.memorys[row].itemconfig(item, bg="red")
+        row = math.floor(instr / self.per_thing)
+        item = instr % self.per_thing
+        self.memory_nums[row].itemconfig(item, bg="green")
+        self.memorys[row].itemconfig(item, bg="green")
+
 
 class AssembleGUI:
     def __init__(self):
         self.root = tkinter.Tk()
         self.root.wm_title("yaplmc")
         f = fdialog.askopenfile()
+        if f is None:
+            self.exit()
         self.fname = f.name
         self.root.wm_title("yaplmc - " + self.fname)
         code = f.read().split("\n")
@@ -153,10 +177,12 @@ class RunGUI:
 
         self.input_var = tkinter.StringVar()
         self.input = tkinter.Entry(self.control_frame, width=5,
-                                   textvariable=self.input_var)
+                                   textvariable=self.input_var,
+                                   state="disabled")
         self.input.grid(row=2, column=1)
         self.input_btn = tkinter.Button(self.control_frame, text="Submit",
-                                        command=self.got_input)
+                                        command=self.got_input,
+                                        state="disabled")
         self.input_btn.grid(row=2, column=2)
 
         tkinter.Label(self.control_frame, text="Output").grid(row=3,
@@ -187,12 +213,31 @@ class RunGUI:
 
     def next_step(self):
         self.run_wrapper(self.runner.next_step)
+        self.update_memory()
+
+    def runhlt(self):
+        r = yaplmc.HALT_REASON_STEP
+        while r == yaplmc.HALT_REASON_STEP:
+            r = self.runner.next_step()
+            self.update_memory()
+        return r
 
     def run_to_hlt(self):
         self.run_to_halt = True
-        ret = self.run_wrapper(self.runner.run_to_hlt)
+        ret = self.run_wrapper(self.runhlt)
         if ret == yaplmc.HALT_REASON_HLT:
             self.run_to_halt = False
+
+    def set_colors(self):
+        if self.runner.accumulator_changed:
+            self.accumulator.config(bg="red")
+        elif self.runner.accumulator_read:
+            self.accumulator.config(bg="yellow")
+        else:
+            self.accumulator.config(bg="white")
+        self.memory_frame.set_colors(self.runner.memory_changed,
+                                     self.runner.memory_read,
+                                     self.runner.instruction_addr)
 
     def update_memory(self):
         self.memory_frame.update_memory(self.runner.memory)
@@ -200,6 +245,7 @@ class RunGUI:
         self.accumulator.insert(tkinter.END, self.runner.accumulator)
         self.counter.delete(tkinter.END)
         self.counter.insert(tkinter.END, self.runner.counter)
+        self.set_colors()
 
     def mainloop(self):
         self.root.mainloop()
@@ -214,11 +260,14 @@ class RunGUI:
         self.update_memory()
         self.getting_inp = True
         self.input.focus()
+        self.input["state"] = "normal"
+        self.input_btn["state"] = "normal"
 
     def got_input(self):
         i = self.input_var.get()
         self.input_var.set("")
-        self.run_to_hlt_btn.focus()
+        self.input["state"] = "disabled"
+        self.input_btn["state"] = "disabled"
         if self.getting_inp:
             self.runner.give_input(int(i))
             self.getting_inp = False

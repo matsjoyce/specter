@@ -138,7 +138,7 @@ HALT_REASON_STEP = 2
 class Runner:
     def __init__(self, program, get_input=None, halt_for_inp=False,
                  give_output=None, debug_output=None, debug_level=0):
-        self.counter = 0
+        self.counter = self.instruction_addr = 0
         self.accumulator = 0
         self.code = program
         self.memory = self.code.copy()
@@ -147,6 +147,10 @@ class Runner:
         self.halt_for_inp = halt_for_inp
         self.debug_level = debug_level
         self.unfiltered_debug_output = debug_output or self._debug_output
+        self.accumulator_read = False
+        self.accumulator_changed = False
+        self.memory_changed = set()
+        self.memory_read = set()
 
     def debug_output(self, msg, level):
         if level <= self.debug_level:
@@ -171,9 +175,32 @@ class Runner:
         print(i)
 
     def give_input(self, i):
-        self.accumulator = self.cap(i)
+        self.setaccum(self.cap(i))
+
+    # Below functions are to be used inside next_step, to keep track
+    # of what has been read and written
+
+    def readaccum(self):
+        self.accumulator_read = True
+        return self.accumulator
+
+    def setaccum(self, value):
+        self.accumulator = value
+        self.accumulator_changed = True
+
+    def readmem(self, addr):
+        self.memory_read.add(addr)
+        return self.memory[addr]
+
+    def setmem(self, addr, value):
+        self.memory[addr] = value
+        self.memory_changed.add(addr)
 
     def next_step(self):
+        self.accumulator_read = False
+        self.accumulator_changed = False
+        self.memory_changed = set()
+        self.memory_read = set()
         self.debug_output("Executing next instruction"
                           " at {:03}".format(self.counter), DEBUG_LEVEL_HIGH)
         instruction = self.memory[self.counter]
@@ -186,6 +213,7 @@ class Runner:
                           DEBUG_LEVEL_MEDIUM)
         self.debug_output("Counter: {}".format(self.counter),
                           DEBUG_LEVEL_MEDIUM)
+        self.instruction_addr = self.counter
         self.counter += 1
         self.debug_output("Incrementing counter to {}".format(self.counter),
                           DEBUG_LEVEL_HIGH)
@@ -199,44 +227,47 @@ class Runner:
         elif instruction < 100:
             raise RuntimeError("Invalid instruction {:03}".format(instruction))
         elif instruction < 200:  # ADD
-            value = self.cap(self.accumulator + self.memory[addr])
+            memval = self.readmem(addr)
+            value = self.cap(self.readaccum() + memval)
             self.debug_output("ADD {:03}: accumulator = {} + {} = {}"
-                              .format(addr, self.accumulator,
-                                      self.memory[addr], value),
+                              .format(addr, self.readaccum(),
+                                      memval, value),
                               DEBUG_LEVEL_LOW)
-            self.accumulator = value
+            self.setaccum(value)
         elif instruction < 300:  # SUB
-            value = self.cap(self.accumulator - self.memory[addr])
+            memval = self.readmem(addr)
+            value = self.cap(self.readaccum() - memval)
             self.debug_output("SUB {:03}: accumulator = {} - {} = {}"
-                              .format(addr, self.accumulator,
-                                      self.memory[addr], value),
+                              .format(addr, self.readaccum(),
+                                      memval, value),
                               DEBUG_LEVEL_LOW)
-            self.accumulator = value
+            self.setaccum(value)
         elif instruction < 400:  # STA
             self.debug_output("STA {:03}: accumulator = {}"
-                              .format(addr, self.accumulator), DEBUG_LEVEL_LOW)
-            self.memory[addr] = self.accumulator
+                              .format(addr, self.readaccum()), DEBUG_LEVEL_LOW)
+            self.setmem(addr, self.readaccum())
         elif instruction < 600:  # LDA
+            memval = self.readmem(addr)
             self.debug_output("LDA {:03}: value = {}"
-                              .format(addr, self.memory[addr]),
+                              .format(addr, memval),
                               DEBUG_LEVEL_LOW)
-            self.accumulator = self.memory[addr]
+            self.setaccum(memval)
         elif instruction < 700:  # BRA
             self.debug_output("BRA {:03}".format(addr), DEBUG_LEVEL_LOW)
             self.counter = addr
         elif instruction < 800:  # BRZ
-            word = "" if self.accumulator == 0 else " no"
+            word = "" if self.readaccum() == 0 else " no"
             self.debug_output("BRZ {:03}: accumulator = {}, so{} branch"
-                              .format(addr, self.accumulator, word),
+                              .format(addr, self.readaccum(), word),
                               DEBUG_LEVEL_LOW)
-            if self.accumulator == 0:
+            if self.readaccum() == 0:
                 self.counter = addr
         elif instruction < 900:  # BRP
-            word = "" if self.accumulator < 500 else " no"
+            word = "" if self.readaccum() < 500 else " no"
             self.debug_output("BRP {:03}: accumulator = {}, so{} branch"
-                              .format(addr, self.accumulator, word),
+                              .format(addr, self.readaccum(), word),
                               DEBUG_LEVEL_LOW)
-            if self.accumulator < 500:
+            if self.readaccum() < 500:
                 self.counter = addr
         elif instruction == 901:  # INP
             self.debug_output("INP", DEBUG_LEVEL_LOW)
@@ -244,10 +275,10 @@ class Runner:
                 return HALT_REASON_INP
             else:
                 i = self.int_to_complement(self.get_input())
-                self.accumulator = self.cap(i)
+                self.setaccum(self.cap(i))
         elif instruction == 902:  # OUT
             self.debug_output("OUT", DEBUG_LEVEL_LOW)
-            self.give_output(self.int_from_complement(self.accumulator))
+            self.give_output(self.int_from_complement(self.readaccum()))
         else:
             raise RuntimeError("Invalid instruction {:03}".format(instruction))
         return HALT_REASON_STEP
@@ -262,6 +293,10 @@ class Runner:
         self.counter = 0
         self.accumulator = 0
         self.memory = self.code.copy()
+        self.accumulator_read = False
+        self.accumulator_changed = False
+        self.memory_changed = set()
+        self.memory_read = set()
 
 if __name__ == "__main__":
     import argparse
