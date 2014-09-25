@@ -23,7 +23,7 @@ GUI
  - Have fun!
  - When the `input` field is "selected", type in a integer value between `-500` and `499` and press `Submit`.
 
-![](https://github.com/matsjoyce/yaplmc/blob/master/screenshots/screenshot.png)
+![](https://github.com/matsjoyce/yaplmc/blob/master/screenshots/screenshot4.png)
 
 Examples
 ========
@@ -47,14 +47,15 @@ Included examples (in the `examples` folder), sorted by subjective, relative mea
 Advanced Usage
 ==============
 
-See the [wiki](https://github.com/matsjoyce/yaplmc/wiki).
+See the [wiki](https://github.com/matsjoyce/yaplmc/wiki) for documentation, [issues](https://github.com/matsjoyce/yaplmc/issues) for bug reporting / feature requests and [pull requests](https://github.com/matsjoyce/yaplmc/pulls) for contributing code.
 
 Licence
 =======
 
-GPL 3 or later
+[GPL 3](https://github.com/matsjoyce/yaplmc/blob/master/LICENSE.md) or later
 
 More Information
 ===============
 
- - https://en.wikipedia.org/wiki/Little_man_computer
+ - https://en.wikipedia.org/wiki/Little_man_computer - `yaplmc` follows the instruction set as far as possible
+ - https://github.com/matsjoyce/yaplmc/wiki - documentation

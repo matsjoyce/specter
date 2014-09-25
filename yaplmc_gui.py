@@ -121,10 +121,10 @@ class AssembleGUI(simpledialog.Dialog):
 
         if self.f is None:
             f = self.get_file()
-            if f is None:
-                self.cancel()
         else:
             f = open(self.f)
+        if f is None:
+            exit(0)
 
         self.fname = f.name
         self.title("yaplmc - " + self.fname)
@@ -413,9 +413,6 @@ This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions. Type `yaplmc --licence` for details.
                                          """.strip())
-    arg_parser.add_argument("-d", "--debug", help="debug level"
-                            " (repeat for more info, 3 is the max)",
-                            action="count", default=0)
     arg_parser.add_argument("-f", "--file", help="lmc file",
                             default=None)
     arg_parser.add_argument("-l", "--licence", help="display licence",
