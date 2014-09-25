@@ -138,19 +138,13 @@ HALT_REASON_STEP = 2
 class Runner:
     def __init__(self, program, get_input=None, halt_for_inp=False,
                  give_output=None, debug_output=None, debug_level=0):
-        self.counter = self.instruction_addr = 0
-        self.accumulator = 0
         self.code = program
-        self.memory = self.code.copy()
         self.get_input = get_input if get_input else self._get_input
         self.give_output = give_output if give_output else self._give_output
         self.halt_for_inp = halt_for_inp
         self.debug_level = debug_level
         self.unfiltered_debug_output = debug_output or self._debug_output
-        self.accumulator_read = False
-        self.accumulator_changed = False
-        self.memory_changed = set()
-        self.memory_read = set()
+        self.reset()
 
     def debug_output(self, msg, level):
         if level <= self.debug_level:
@@ -290,7 +284,7 @@ class Runner:
         return r
 
     def reset(self):
-        self.counter = 0
+        self.counter = self.instruction_addr = 0
         self.accumulator = 0
         self.memory = self.code.copy()
         self.accumulator_read = False
