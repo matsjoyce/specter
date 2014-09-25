@@ -27,10 +27,10 @@ __email__ = "matsjoyce@gmail.com"
 __status__ = "Development"
 
 import tkinter
-from tkinter import filedialog as fdialog
-from tkinter import scrolledtext as stext
+from tkinter import filedialog as fdialog, scrolledtext as stext, simpledialog
 import yaplmc
 import math
+from functools import partial
 
 CHANGED = "#E00"
 CHANGEDN = "#C00"
@@ -43,111 +43,137 @@ DEFAULTN = "#DDD"
 
 
 class MemoryDisplay(tkinter.Frame):
-    def __init__(self, root, rows=5):
+    def __init__(self, root, setmem, rows=5):
         super().__init__(root)
         tkinter.Label(self, text="Memory").grid(row=0, column=1,
                                                 columnspan=rows * 2)
+        self.setmem = setmem
         self.rows = rows
         self.per_thing = 100 // rows
         self.memory_nums = []
         self.memorys = []
-        for i in range(rows):
-            mn = tkinter.Listbox(self, setgrid=True,
-                                 height=self.per_thing, width=2)
-            mn.grid(row=1, column=i * 2)
-            for j in range(self.per_thing * i, self.per_thing * (i + 1)):
-                mn.insert(tkinter.END, j)
-            self.memory_nums.append(mn)
+        self.mem_vars = []
+        self.updatingmem = True
+        for i in range(100):
+            col = int(math.floor(i / self.per_thing))
+            row = i % self.per_thing + 1
 
-            m = tkinter.Listbox(self, setgrid=True,
-                                height=self.per_thing, width=3,
-                                bg=DEFAULT)
-            m.grid(row=1, column=i * 2 + 1)
+            mn = tkinter.Entry(self, width=2, bg=DEFAULT, borderwidth=0)
+            mn.grid(row=row, column=col * 2)
+            mn.insert(0, str(i).zfill(2))
+            self.memory_nums.append(mn)
+            mn["state"] = "readonly"
+
+            var = tkinter.StringVar(value="000")
+            vcmd = self.register(partial(self.changed, i)), "%P"
+            m = tkinter.Entry(self, width=3, bg=DEFAULT, borderwidth=0,
+                              textvariable=var, vcmd=vcmd, validate="key")
+            m.grid(row=row, column=col * 2 + 1)
             self.memorys.append(m)
+            self.mem_vars.append(var)
+        self.updatingmem = False
+
+    def changed(self, addr, num):
+        if self.updatingmem:
+            return True
+        print("changed", addr, num, self)
+        if not num.isdigit() or int(num) not in range(1000):
+            return False
+        return self.setmem(addr, int(num))
 
     def update_memory(self, mem):
-        for m in self.memorys:
-            m.delete(0, tkinter.END)
-        for i in range(self.rows):
-            for j in mem[self.per_thing * i:self.per_thing * (i + 1)]:
-                self.memorys[i].insert(tkinter.END, str(j).zfill(3))
+        self.updatingmem = True
+        for i, m in enumerate(mem):
+            self.mem_vars[i].set(str(m).zfill(3))
+        self.updatingmem = False
 
     def set_colors(self, mem_changed, mem_read, instr):
-        for row in range(self.rows):
-            for i in range(self.per_thing):
-                self.memory_nums[row].itemconfig(i, bg=DEFAULTN)
-                self.memorys[row].itemconfig(i, bg=DEFAULT)
+        for i in range(100):
+            self.memory_nums[i]["readonlybackground"] = DEFAULTN
+            self.memorys[i]["bg"] = DEFAULT
         for i in mem_read:
-            row = math.floor(i / self.per_thing)
-            item = i % self.per_thing
-            self.memory_nums[row].itemconfig(item, bg=READN)
-            self.memorys[row].itemconfig(item, bg=READ)
+            self.memory_nums[i]["readonlybackground"] = READN
+            self.memorys[i]["bg"] = READ
         for i in mem_changed:
-            row = math.floor(i / self.per_thing)
-            item = i % self.per_thing
-            self.memory_nums[row].itemconfig(item, bg=CHANGEDN)
-            self.memorys[row].itemconfig(item, bg=CHANGED)
-        row = math.floor(instr / self.per_thing)
-        item = instr % self.per_thing
-        self.memory_nums[row].itemconfig(item, bg=INTRN)
-        self.memorys[row].itemconfig(item, bg=INTR)
+            self.memory_nums[i]["readonlybackground"] = CHANGEDN
+            self.memorys[i]["bg"] = CHANGED
+        self.memory_nums[instr]["readonlybackground"] = INTRN
+        self.memorys[instr]["bg"] = INTR
 
 
-class AssembleGUI:
-    def __init__(self):
-        self.root = tkinter.Tk()
-        self.l = tkinter.Label(self.root, text="Waiting for file...",
-                               padx=10, pady=10)
-        self.l.grid(row=0, column=0)
-        self.root.wm_title("yaplmc")
+class AssembleGUI(simpledialog.Dialog):
+    def __init__(self, f=None, parent=None):
+        self.f = f
+        super().__init__(parent)
+
+    def get_file(self):
+        l = tkinter.Label(self.root, text="Waiting for file...",
+                          padx=10, pady=10)
+        l.pack()
         f = fdialog.askopenfile()
 
-        self.l.destroy()
-        if f is None:
-            self.exit()
+        l.destroy()
+        return f
+
+    def body(self, root):
+        self.root = root
+        self.title("yaplmc")
+
+        if self.f is None:
+            f = self.get_file()
+            if f is None:
+                self.cancel()
+        else:
+            f = open(self.f)
+
         self.fname = f.name
-        self.root.wm_title("yaplmc - " + self.fname)
+        self.title("yaplmc - " + self.fname)
+
         code = f.read().split("\n")
+
         try:
             self.code, code_length = yaplmc.assemble(code)
         except SyntaxError as e:
+            self.code = None
             tkinter.Label(self.root, text="Assembly failed!\nError:").pack()
+
             t = tkinter.Text(self.root)
             t.insert(tkinter.END, e.args[0])
             t.pack()
-            tkinter.Button(self.root, text="Exit", command=self.exit).pack()
         else:
-            self.l = tkinter.Label(self.root,
-                                   text="Assembly succeeded!\nCode:")
-            self.l.grid(row=0, column=0)
-            self.t = tkinter.Text(self.root)
+            tkinter.Label(self.root, text="Assembly succeeded!\nCode:").pack()
+
+            t = tkinter.Text(self.root)
             code = " ".join(str(i).zfill(3) for i in self.code[:code_length])
-            self.t.insert(tkinter.END, code)
-            self.t.grid(row=1, column=0)
-            self.b = tkinter.Button(self.root, text="Run", command=self.run)
-            self.b.grid(row=2, column=0)
+            t.insert(tkinter.END, code)
+            t.pack()
 
-    def exit(self):
-        self.root.destroy()
-        exit(1)
+    def buttonbox(self):
+        box = tkinter.Frame(self)
 
-    def run(self):
-        self.l.destroy()
-        self.t.destroy()
-        self.b.destroy()
-        RunGUI(self.root, self.code)
+        if self.code:
+            b = tkinter.Button(box, text="Run", command=self.cancel)
+            b.pack(side=tkinter.LEFT)
+        b = tkinter.Button(box, text="Exit", command=self.cancel)
+        b.pack(side=tkinter.LEFT)
+
+        self.bind("<Return>", self.ok if self.code else self.cancel)
+        self.bind("<Escape>", self.cancel)
+        box.pack()
+
+
+def get_assembled_code(f, r):
+    a = AssembleGUI(f, r)
+    return (a.code, a.fname) if hasattr(a, "code") else (None, None)
 
 
 class RunGUI:
-    def __init__(self, root, code):
-        self.root = root
-        self.root.wm_minsize(68, 24)
-        # self.root.wm_maxsize(68, 24)
+    def __init__(self):
+        self.root = tkinter.Tk()
+        self.root.title("yaplmc")
 
         self.getting_inp = False
         self.run_to_halt = False
-        self.runner = yaplmc.Runner(code, give_output=self.give_output,
-                                    halt_for_inp=True)
 
         # Top row of buttons
 
@@ -179,7 +205,7 @@ class RunGUI:
         # Left row of inputs
 
         self.control_frame = tkinter.Frame(self.root)
-        self.control_frame.grid(row=1, column=0)
+        self.control_frame.grid(row=1, column=0, sticky="n")
 
         tkinter.Label(self.control_frame, text="Accumulator:").grid(row=0,
                                                                     column=0,
@@ -204,9 +230,11 @@ class RunGUI:
                                                               sticky="w")
 
         self.input_var = tkinter.StringVar()
+        vcmd = self.root.register(self.check_input), "%P"
         self.input = tkinter.Entry(self.control_frame, width=5,
                                    textvariable=self.input_var,
-                                   state="disabled")
+                                   state="disabled",
+                                   validate="key", vcmd=vcmd)
         self.input.grid(row=2, column=1)
         self.input_btn = tkinter.Button(self.control_frame, text="Submit",
                                         command=self.got_input,
@@ -221,7 +249,6 @@ class RunGUI:
                                          width=20, state="disabled",
                                          bg="white")
         self.output.grid(row=3, column=1, columnspan=2)
-        self.outputs = []
 
         tkinter.Label(self.control_frame, text="Speed:").grid(row=4,
                                                               column=0,
@@ -237,12 +264,16 @@ class RunGUI:
 
         # Memory display on right
 
-        self.memory_frame = MemoryDisplay(self.root)
+        self.memory_frame = MemoryDisplay(self.root, self.setmem)
         self.memory_frame.grid(row=1, column=1)
 
-        self.update_memory()
-
         self.root.after(1, self.run_halt_check)  # Kick off
+
+    def set_code(self, code, fname):
+        self.runner = yaplmc.Runner(code, give_output=self.give_output,
+                                    halt_for_inp=True)
+        self.root.title("yaplmc - " + fname)
+        self.update_memory()
 
     def run_wrapper(self, func):
         if self.getting_inp:
@@ -258,17 +289,33 @@ class RunGUI:
         return ret
 
     def next_step(self):
-        self.run_wrapper(self.runner.next_step)
-        self.update_memory()
-
-    def run_halt_check(self):
-        if self.run_to_halt and not self.getting_inp:
+        if self.getting_inp:
+            self.get_input()
+            return
+        try:
             ret = self.runner.next_step()
             self.update_memory()
-            if ret == yaplmc.HALT_REASON_HLT:
-                self.run_to_halt = False
-            elif ret == yaplmc.HALT_REASON_INP:
-                self.get_input()
+        except RuntimeError as e:
+            self.give_output("Error:\n{}".format(e.args[0]))
+            return
+        if ret == yaplmc.HALT_REASON_INP:
+            self.get_input()
+        return ret
+
+    def run_halt_check(self):
+        if self.getting_inp:
+            self.get_input()
+        elif self.run_to_halt:
+            try:
+                ret = self.runner.next_step()
+            except RuntimeError as e:
+                self.give_output("Error:\n{}".format(e.args[0]))
+            else:
+                self.update_memory()
+                if ret == yaplmc.HALT_REASON_HLT:
+                    self.run_to_halt = False
+                elif ret == yaplmc.HALT_REASON_INP:
+                    self.get_input()
         i = int(self.speed_scale.get() * 1000)
         if i == 0 and not (self.run_to_halt and not self.getting_inp):
             i = 1
@@ -298,18 +345,28 @@ class RunGUI:
         self.counter.delete(tkinter.END)
         self.counter.insert(tkinter.END, self.runner.counter)
         self.set_colors()
-        self.output["state"] = "normal"
-        self.output.delete(1.0, tkinter.END)
-        self.output.insert(tkinter.END, "\n".join(self.outputs))
-        self.output.see(tkinter.END)
-        self.output["state"] = "disabled"
 
-    def give_output(self, i):
+    def give_output(self, i, err=False):
         if isinstance(i, int):
             if i >= 500:
                 i = i - 1000
         i = str(i)
-        self.outputs.append(i)
+        self.output["state"] = "normal"
+        if self.output.get(1.0, tkinter.END) == "\n":
+            self.output.delete(1.0, tkinter.END)
+        else:
+            self.output.insert(tkinter.END, "\n")
+        self.output.insert(tkinter.END, i)
+        self.output.see(tkinter.END)
+        self.output["state"] = "disabled"
+
+    def check_input(self, num):
+        if num in ("", "-"):
+            return True
+        try:
+            return int(num) in range(-500, 500)
+        except ValueError:
+            return False
 
     def get_input(self):
         self.getting_inp = True
@@ -327,17 +384,55 @@ class RunGUI:
             self.getting_inp = False
             self.update_memory()
 
+    def setmem(self, addr, value):
+        if self.run_to_halt or self.getting_inp:
+            return False
+        self.runner.setmem(addr, value)
+        self.set_colors()
+        return True
+
     def reset(self):
         self.run_to_halt = False
         self.getting_inp = False
-        self.outputs = []
+        self.output["state"] = "normal"
+        self.output.delete(1.0, tkinter.END)
+        self.output["state"] = "disabled"
         self.runner.reset()
         self.update_memory()
 
     def exit(self):
         self.root.destroy()
-        exit(0)
 
 if __name__ == "__main__":
-    AssembleGUI()
-    tkinter.mainloop()
+    import argparse
+
+    arg_parser = argparse.ArgumentParser(description=__doc__.split("\n")[1],
+                                         epilog="""
+yaplmc Copyright (C) 2014  Matthew Joyce
+This program comes with ABSOLUTELY NO WARRANTY.
+This is free software, and you are welcome to redistribute it
+under certain conditions. Type `yaplmc --licence` for details.
+                                         """.strip())
+    arg_parser.add_argument("-d", "--debug", help="debug level"
+                            " (repeat for more info, 3 is the max)",
+                            action="count", default=0)
+    arg_parser.add_argument("-f", "--file", help="lmc file",
+                            default=None)
+    arg_parser.add_argument("-l", "--licence", help="display licence",
+                            action="store_true")
+    arg_parser.add_argument("-V", "--version", help="display version",
+                            action="store_true")
+
+    args_from_parser = arg_parser.parse_args()
+
+    if args_from_parser.licence:
+        print(__doc__.strip())
+        exit()
+    elif args_from_parser.version:
+        print("yaplmc", __version__)
+        exit()
+    r = RunGUI()
+    code, fname = get_assembled_code(args_from_parser.file, r.root)
+    if code:
+        r.set_code(code, fname)
+        tkinter.mainloop()
