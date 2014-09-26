@@ -1,0 +1,56 @@
+<language name="Little Man Computer" version="1.0" style="" kateversion="2.4" section="Assembler" extensions="*.lmc">
+    <highlighting>
+        <list name="arg_mnemonics">
+                <item>ADD</item>
+                <item>SUB</item>
+                <item>STA</item>
+                <item>LDA</item>
+                <item>BRA</item>
+                <item>BRZ</item>
+                <item>BRP</item>
+                <item>DAT</item>
+        </list>
+        <list name="noarg_mnemonics">
+                <item>INP</item>
+                <item>OUT</item>
+                <item>HLT</item>
+        </list>
+        <contexts>
+            <context name="Normal" attribute="Error Text" lineEndContext="#stay">
+                <keyword attribute="Mnemonic Text" String="arg_mnemonics" context="Arg"/>
+                <keyword attribute="Mnemonic Text" String="noarg_mnemonics" context="Error" caseSensitive="false"/>
+                <DetectChar attribute="Comment Text" char="#" context="Comment"/>
+                <RegExpr attribute="Label" String="[^ ]+" context="Mnemonic"/>
+                <DetectChar attribute="Space Text" char=" " context="#stay"/>
+            </context>
+            <context name="Mnemonic" attribute="Error Text" lineEndContext="Normal">
+                <keyword attribute="Mnemonic Text" String="arg_mnemonics" context="Arg"/>
+                <keyword attribute="Mnemonic Text" String="noarg_mnemonics" context="Error" caseSensitive="false"/>
+                <DetectChar attribute="Space Text" char=" " context="#stay"/>
+            </context>
+            <context name="Arg" attribute="Label" lineEndContext="Normal">
+                <RegExpr attribute="Number" String=" -?\d{1,3}([^\w]|$)" context="Error"/>
+                <RegExpr attribute="Label" String=" [^ ]+" context="Error"/>
+                <DetectChar attribute="Space Text" char=" " context="Error"/>
+                <DetectChar attribute="Comment Text" char="#" context="Comment"/>
+            </context>
+            <context name="Comment" attribute="Comment Text" lineEndContext="Normal">
+            </context>
+            <context name="Error" attribute="Error Text" lineEndContext="Normal">
+                <DetectChar attribute="Comment Text" char="#" context="Comment"/>
+                <DetectChar attribute="Space Text" char=" " context="#stay"/>
+            </context>
+        </contexts>
+            <itemDatas>
+                <itemData name="Space Text" defStyleNum="dsNormal" spellChecking="false"/>
+                <itemData name="Normal Text" defStyleNum="dsComment" spellChecking="false"/>
+                <itemData name="Mnemonic Text" defStyleNum="dsKeyword" spellChecking="false"/>
+                <itemData name="Label" defStyleNum="dsOthers" spellChecking="false"/>
+                <itemData name="Number" defStyleNum="dsDecVal" spellChecking="false"/>
+                <itemData name="Comment Text" defStyleNum="dsComment" spellChecking="true"/>
+                <itemData name="Error Text" defStyleNum="dsError" spellChecking="true"/>
+            </itemDatas>
+    </highlighting>
+    <general>
+    </general>
+</language>
