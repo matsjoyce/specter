@@ -1,12 +1,13 @@
 # From https://en.wikipedia.org/wiki/Little_man_computer
 # Subtract two numbers
-INP
-STA FIRST
-INP
-STA SECOND
-LDA FIRST
-SUB SECOND
-OUT
-HLT
-FIRST DAT
-SECOND DAT
+
+        INP
+        STA FIRST
+        INP
+        STA SECOND
+        LDA FIRST
+        SUB SECOND
+        OUT
+        HLT
+FIRST   DAT
+SECOND  DAT

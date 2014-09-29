@@ -1,5 +1,6 @@
 # Prints 1 for ever
-LDA ONE
-START OUT
-BRA START
-ONE DAT 1
+
+        LDA ONE
+START   OUT
+        BRA START
+ONE     DAT 1

@@ -1,20 +1,21 @@
 # Multiply two numbers. Seems to work on negative numbers as well.
-INP
-STA FIRST
-INP
-STA SECOND
-START LDA RESULT
-ADD FIRST
-STA RESULT
-LDA SECOND
-SUB ONE
-STA SECOND
-BRZ END
-BRA START
-END LDA RESULT
-OUT
-HLT
-RESULT DAT
-FIRST DAT
-SECOND DAT
-ONE DAT 1
+
+        INP
+        STA FIRST
+        INP
+        STA SECOND
+START   LDA RESULT
+        ADD FIRST
+        STA RESULT
+        LDA SECOND
+        SUB ONE
+        STA SECOND
+        BRZ END
+        BRA START
+END     LDA RESULT
+        OUT
+        HLT
+RESULT  DAT
+FIRST   DAT
+SECOND  DAT
+ONE     DAT 1
