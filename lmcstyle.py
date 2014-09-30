@@ -1,31 +1,52 @@
 import os
 
-instructions = {"ADD", "SUB", "STA", "LDA", "BRA", "BRZ", "BRP", "INP", "OUT", "HLT", "DAT"}
+instructions = {"ADD", "SUB", "STA", "LDA", "BRA", "BRZ", "BRP", "INP",
+                "OUT", "HLT", "DAT"}
 
 eightspaces = " " * 8
+fourspaces = " " * 4
 
 
 def check(lines):
     errors = []
+    no_ending_nl = False
     if not lines[-1].endswith("\n"):
-        errors.append((len(lines) - 1, "file does not end with newline"))
+        no_ending_nl = True
         lines[-1] += "\n"
+
     for lineno, line in enumerate(lines):
         if line.startswith("#"):
             if not line.startswith("# "):
                 errors.append((lineno, "comment does not begin with '# '"))
                 continue
             continue
+        if line.strip().startswith("#"):
+            if not line.strip().startswith("# "):
+                errors.append((lineno, "comment does not begin with '# '"))
+                continue
+            if not line.startswith(eightspaces + fourspaces + eightspaces) \
+               or line[20] != "#":
+                errors.append((lineno, "continuing comment should be "
+                               "padded by twenty spaces"))
+                continue
+            if line[20] != "#":
+                errors.append((lineno, "continuing comment should be "
+                               "padded by twenty spaces"))
+                continue
+            continue
         if line == "\n":
             continue
-        if line.strip() == "\n":
-            print(repr(line))
-            errors.append((lineno, "blank line has whitespace"))
+        if line[-2].isspace():
+            errors.append((lineno, "line ends with whitespace"))
             continue
         sline = line.split()
-        if sline[0] in instructions:
+        if sline[0].upper() in instructions:
             if not line.startswith(eightspaces):
-                errors.append((lineno, "line with no label not indented by 8 spaces"))
+                errors.append((lineno, "line with no label should be"
+                               " indented by 8 spaces"))
+                continue
+            if sline[0].upper() != sline[0]:
+                errors.append((lineno, "mnemonics should be uppercase"))
                 continue
         else:
             if line[0].isspace():
@@ -36,19 +57,19 @@ def check(lines):
                 continue
             sline = sline[1:]
         nline = line[8:]
-        if not len(sline) or sline[0] not in instructions:
+        if not len(sline) or sline[0].upper() not in instructions:
             errors.append((lineno, "mnemonic missing"))
             continue
+        else:
+            if sline[0].upper() != sline[0]:
+                errors.append((lineno, "mnemonics should be uppercase"))
+                continue
         if len(sline) > 1:
             if not nline.startswith(sline[0]):
                 print(repr(sline[0]), repr(nline))
                 errors.append((lineno, "mnemonic not padded to 4 spaces"))
                 continue
         else:
-            if not line.endswith(sline[0] + "\n"):
-                print(repr(sline[0]), repr(line))
-                errors.append((lineno, "line ends with space(s)"))
-                continue
             continue  # Done line containing no comment or arg
         sline = sline[1:]
         nline = nline[4:]
@@ -65,27 +86,27 @@ def check(lines):
                 continue
             if len(sline) > 1:
                 if not nline.startswith("{:<8}".format(sline[0])):
-                    errors.append((lineno, "label not padded enough"))
+                    errors.append((lineno, "argument not padded enough"))
                     continue
             else:
-                if not nline.endswith(sline[0] + "\n"):
-                    errors.append((lineno, "line has trailing whitespace"))
-                    continue
                 continue  # Done line containing arg or comment
         sline = sline[1:]
         nline = nline[8:]
         if nline[0].isspace():
-            errors.append((lineno, "label padded too much"))
+            errors.append((lineno, "argument padded too much"))
             continue
         if not nline.startswith("#"):
-            errors.append((lineno, "too many args"))
+            errors.append((lineno, "too many arguments"))
             continue
         if not nline.startswith("# "):
             errors.append((lineno, "comment does not begin with '# '"))
             continue
-        if not nline.endswith(sline[-1] + "\n"):
-            errors.append((lineno, "line has trailing whitespace"))
-            continue
+
+    if no_ending_nl:
+        errors.append((len(lines) - 1, "file does not end with newline"))
+
+    if len(lines) > 2 and lines[-2] == "\n":
+        errors.append((len(lines) - 1, "file ends with too many newlines"))
     return errors
 
 
@@ -109,5 +130,6 @@ def process_file(fname):
 
 if __name__ == "__main__":
     import sys
+    if len(sys.argv) < 2:
+        sys.argv.append(os.curdir)
     process_file(sys.argv[1])
-
