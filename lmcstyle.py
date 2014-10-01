@@ -105,7 +105,7 @@ def check(lines):
     if no_ending_nl:
         errors.append((len(lines) - 1, "file does not end with newline"))
 
-    if len(lines) > 2 and lines[-2] == "\n":
+    if len(lines) > 1 and lines[-1] == "\n":
         errors.append((len(lines) - 1, "file ends with too many newlines"))
     return errors
 
