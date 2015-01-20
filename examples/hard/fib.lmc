@@ -1,4 +1,4 @@
-# Little man's fibonacci, a traditional challenge. Input number of terms to display.
+# Little man's Fibonacci, a traditional challenge. Input number of terms to display. Starts at 0.
 
         INP
         STA COUNT
