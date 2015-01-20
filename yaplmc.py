@@ -121,6 +121,8 @@ def assemble(lines):
                 arg = str(labels[arg])
             assembled.append(int(add_arg(instr, arg, lineno, line)))
     l = len(assembled)
+    if l > 100:
+        raise RuntimeError("Code is too large")
     while len(assembled) != 100:
         assembled.append(0)
     return assembled, l
