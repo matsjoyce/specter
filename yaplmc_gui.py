@@ -283,6 +283,7 @@ class RunGUI:
             ret = func()
         except RuntimeError as e:
             self.give_output("Error:\n{}".format(e.args[0]))
+            self.run_to_halt = False
             return
         if ret == yaplmc.HALT_REASON_INP:
             self.get_input()
@@ -297,6 +298,7 @@ class RunGUI:
             self.update_memory()
         except RuntimeError as e:
             self.give_output("Error:\n{}".format(e.args[0]))
+            self.run_to_halt = False
             return
         if ret == yaplmc.HALT_REASON_INP:
             self.get_input()
@@ -310,6 +312,7 @@ class RunGUI:
                 ret = self.runner.next_step()
             except RuntimeError as e:
                 self.give_output("Error:\n{}".format(e.args[0]))
+                self.run_to_halt = False
             else:
                 self.update_memory()
                 if ret == yaplmc.HALT_REASON_HLT:
