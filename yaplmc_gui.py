@@ -77,6 +77,8 @@ class MemoryDisplay(tkinter.Frame):
         if self.updatingmem:
             return True
         print("changed", addr, num, self)
+        if not num:
+            num = "0"
         if not num.isdigit() or int(num) not in range(1000):
             return False
         return self.setmem(addr, int(num))
