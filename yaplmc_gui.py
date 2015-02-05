@@ -38,6 +38,8 @@ READ = "#EE0"
 READN = "#CC0"
 INTR = "#0A0"
 INTRN = "#080"
+NINTR = "#CCC"
+NINTRN = "#AAA"
 DEFAULT = "white"
 DEFAULTN = "#DDD"
 
@@ -104,7 +106,7 @@ class MemoryDisplay(tkinter.Frame):
         for i, m in enumerate(mem):
             self.mem_vars[i].set(str(m).zfill(3))
 
-    def set_colors(self, mem_changed, mem_read, instr):
+    def set_colors(self, mem_changed, mem_read, instr, ninstr):
         for i in range(100):
             self.memory_nums[i]["readonlybackground"] = DEFAULTN
             self.memorys[i]["bg"] = DEFAULT
@@ -116,6 +118,8 @@ class MemoryDisplay(tkinter.Frame):
             self.memorys[i]["bg"] = CHANGED
         self.memory_nums[instr]["readonlybackground"] = INTRN
         self.memorys[instr]["bg"] = INTR
+        self.memory_nums[ninstr]["readonlybackground"] = NINTRN
+        self.memorys[ninstr]["bg"] = NINTR
 
 
 class AssembleGUI(simpledialog.Dialog):
@@ -399,7 +403,8 @@ class RunGUI:
             self.accumulator.config(bg=DEFAULT)
         self.memory_frame.set_colors(self.runner.memory_changed,
                                      self.runner.memory_read,
-                                     self.runner.instruction_addr)
+                                     self.runner.instruction_addr,
+                                     self.runner.counter)
 
     def update_memory(self):
         self.memory_frame.update_memory(self.runner.memory)
