@@ -225,7 +225,8 @@ class Runner:
         elif instruction < 200:  # ADD
             memval = self.readmem(addr)
             value = self.cap(self.readaccum() + memval)
-            self.debug_output("ADD {:03}: accumulator = {} + {} = {}"
+            self.debug_output("ADD {0:03}: accumulator = {1:03}"
+                              " (accumulator) + {2:03} (#{0:03}) = {3:03}"
                               .format(addr, self.readaccum(),
                                       memval, value),
                               DEBUG_LEVEL_LOW)
@@ -233,35 +234,41 @@ class Runner:
         elif instruction < 300:  # SUB
             memval = self.readmem(addr)
             value = self.cap(self.readaccum() - memval)
-            self.debug_output("SUB {:03}: accumulator = {} - {} = {}"
+            self.debug_output("SUB {0:03}: accumulator = {1:03} (accumulator)"
+                              " - {2:03} (#{0:03}) = {3:03}"
                               .format(addr, self.readaccum(),
                                       memval, value),
                               DEBUG_LEVEL_LOW)
             self.setaccum(value)
         elif instruction < 400:  # STA
-            self.debug_output("STA {:03}: accumulator = {}"
+            self.debug_output("STA {0:03}: store {1:03} (accumulator)"
+                              " to #{0:03}"
                               .format(addr, self.readaccum()), DEBUG_LEVEL_LOW)
             self.setmem(addr, self.readaccum())
         elif instruction < 600:  # LDA
             memval = self.readmem(addr)
-            self.debug_output("LDA {:03}: value = {}"
+            self.debug_output("LDA {0:03}: load {1:03} (#{0:03}) to "
+                              "accumulator"
                               .format(addr, memval),
                               DEBUG_LEVEL_LOW)
             self.setaccum(memval)
         elif instruction < 700:  # BRA
-            self.debug_output("BRA {:03}".format(addr), DEBUG_LEVEL_LOW)
+            self.debug_output("BRA {0:03}: branch to #{0:03}".format(addr),
+                              DEBUG_LEVEL_LOW)
             self.counter = addr
         elif instruction < 800:  # BRZ
-            word = "" if self.readaccum() == 0 else " no"
-            self.debug_output("BRZ {:03}: accumulator = {}, so{} branch"
-                              .format(addr, self.readaccum(), word),
+            words = ("==", "") if self.readaccum() == 0 else ("!=", " don't")
+            self.debug_output("BRZ {0:03}: {1:03} (accumulator) {2} 000,"
+                              " so{3} branch to #{0:03}"
+                              .format(addr, self.readaccum(), *words),
                               DEBUG_LEVEL_LOW)
             if self.readaccum() == 0:
                 self.counter = addr
         elif instruction < 900:  # BRP
-            word = "" if self.readaccum() < 500 else " no"
-            self.debug_output("BRP {:03}: accumulator = {}, so{} branch"
-                              .format(addr, self.readaccum(), word),
+            words = ("<", "") if self.readaccum() < 500 else (">=", " don't")
+            self.debug_output("BRP {0:03}: {1:03} (accumulator) {2} 500,"
+                              " so{3} branch to #{0:03}"
+                              .format(addr, self.readaccum(), *words),
                               DEBUG_LEVEL_LOW)
             if self.readaccum() < 500:
                 self.counter = addr
