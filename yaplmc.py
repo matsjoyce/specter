@@ -214,8 +214,6 @@ class Runner:
         self.debug_output("Incrementing counter to {}".format(self.counter),
                           DEBUG_LEVEL_HIGH)
         addr = instruction % 100
-        if addr > 99:
-            raise RuntimeError("Invalid memory address")
         if instruction == 0:  # HLT
             self.debug_output("HLT", DEBUG_LEVEL_LOW)
             self.give_output("Done! Coffee break!")
