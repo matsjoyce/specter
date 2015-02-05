@@ -181,7 +181,7 @@ class Runner:
         return self.accumulator
 
     def setaccum(self, value):
-        self.accumulator = value
+        self.accumulator = self.cap(value)
         self.accumulator_changed = True
 
     def readmem(self, addr):
@@ -189,7 +189,7 @@ class Runner:
         return self.memory[addr]
 
     def setmem(self, addr, value):
-        self.memory[addr] = value
+        self.memory[addr] = self.cap(value)
         self.memory_changed.add(addr)
 
     def next_step(self):

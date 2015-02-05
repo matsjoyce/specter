@@ -41,9 +41,22 @@ INTRN = "#080"
 DEFAULT = "white"
 DEFAULTN = "#DDD"
 
+STICKY_NESW = tkinter.NE + tkinter.SW
+
+
+def check_num(num):
+    if num in ("", "-"):
+        num = "0"
+    try:
+        if not int(num) in range(-500, 500):
+            return False, 0
+    except ValueError:
+        return False, 0
+    return True, int(num)
+
 
 class MemoryDisplay(tkinter.Frame):
-    def __init__(self, root, setmem, rows=5):
+    def __init__(self, root, setmem, updater, rows=5):
         super().__init__(root)
         tkinter.Label(self, text="Memory").grid(row=0, column=1,
                                                 columnspan=rows * 2)
@@ -53,41 +66,43 @@ class MemoryDisplay(tkinter.Frame):
         self.memory_nums = []
         self.memorys = []
         self.mem_vars = []
-        self.updatingmem = True
+        self.updater = updater
         for i in range(100):
             col = int(math.floor(i / self.per_thing))
             row = i % self.per_thing + 1
 
             mn = tkinter.Entry(self, width=2, bg=DEFAULT, borderwidth=0)
-            mn.grid(row=row, column=col * 2)
+            mn.grid(row=row, column=col * 2, sticky=STICKY_NESW)
             mn.insert(0, str(i).zfill(2))
             self.memory_nums.append(mn)
             mn["state"] = "readonly"
 
             var = tkinter.StringVar(value="000")
-            vcmd = self.register(partial(self.changed, i)), "%P"
+            vcmd = self.register(partial(self.changed, i)), "%P", "%V"
             m = tkinter.Entry(self, width=3, bg=DEFAULT, borderwidth=0,
-                              textvariable=var, vcmd=vcmd, validate="key")
-            m.grid(row=row, column=col * 2 + 1)
+                              textvariable=var, vcmd=vcmd, validate="all")
+            m.grid(row=row, column=col * 2 + 1, sticky=STICKY_NESW)
             self.memorys.append(m)
             self.mem_vars.append(var)
-        self.updatingmem = False
 
-    def changed(self, addr, num):
-        if self.updatingmem:
-            return True
-        print("changed", addr, num, self)
-        if not num:
-            num = "0"
-        if not num.isdigit() or int(num) not in range(1000):
-            return False
-        return self.setmem(addr, int(num))
+        for x in range(self.rows * 2):
+            self.columnconfigure(x, weight=1)
+        for y in range(self.per_thing + 1):
+            self.rowconfigure(y, weight=1)
+
+    def changed(self, addr, num, reason):
+        if reason == "key":
+            ok, num = check_num(num)
+            if not ok:
+                return False
+            return self.setmem(addr, num)
+        elif reason == "focusout":
+            self.after(0, self.updater)
+        return True
 
     def update_memory(self, mem):
-        self.updatingmem = True
         for i, m in enumerate(mem):
             self.mem_vars[i].set(str(m).zfill(3))
-        self.updatingmem = False
 
     def set_colors(self, mem_changed, mem_read, instr):
         for i in range(100):
@@ -106,6 +121,7 @@ class MemoryDisplay(tkinter.Frame):
 class AssembleGUI(simpledialog.Dialog):
     def __init__(self, f=None, parent=None):
         self.f = f
+        self.code = self.fname = None
         super().__init__(parent)
 
     def get_file(self):
@@ -164,11 +180,6 @@ class AssembleGUI(simpledialog.Dialog):
         box.pack()
 
 
-def get_assembled_code(f, r):
-    a = AssembleGUI(f, r)
-    return (a.code, a.fname) if hasattr(a, "code") else (None, None)
-
-
 class RunGUI:
     def __init__(self):
         self.root = tkinter.Tk()
@@ -180,52 +191,60 @@ class RunGUI:
         # Top row of buttons
 
         self.button_frame = tkinter.Frame(self.root)
-        self.button_frame.grid(row=0, column=0, columnspan=2)
+        self.button_frame.grid(row=0, column=0, columnspan=2,
+                               sticky=tkinter.E + tkinter.W + tkinter.N)
 
         self.run_to_hlt_btn = tkinter.Button(self.button_frame,
                                              text="Run to halt",
                                              command=self.run_to_hlt, width=10)
-        self.run_to_hlt_btn.grid(row=0, column=0)
+        self.run_to_hlt_btn.grid(row=0, column=0, sticky=tkinter.E + tkinter.W)
 
         self.run_step_btn = tkinter.Button(self.button_frame,
                                            text="Run one step",
                                            command=self.next_step, width=10)
-        self.run_step_btn.grid(row=0, column=1)
+        self.run_step_btn.grid(row=0, column=1, sticky=tkinter.E + tkinter.W)
 
-        self.reset_btn = tkinter.Button(self.button_frame, text="Pause",
+        self.pause_btn = tkinter.Button(self.button_frame, text="Pause",
                                         command=self.pause, width=10)
-        self.reset_btn.grid(row=0, column=2)
+        self.pause_btn.grid(row=0, column=2, sticky=tkinter.E + tkinter.W)
 
         self.reset_btn = tkinter.Button(self.button_frame, text="Reset",
                                         command=self.reset, width=10)
-        self.reset_btn.grid(row=0, column=3)
+        self.reset_btn.grid(row=0, column=3, sticky=tkinter.E + tkinter.W)
 
         self.exit_btn = tkinter.Button(self.button_frame, text="Exit",
                                        command=self.exit, width=10)
-        self.exit_btn.grid(row=0, column=4)
+        self.exit_btn.grid(row=0, column=4, sticky=tkinter.E + tkinter.W)
+
+        for col in range(5):
+            self.button_frame.columnconfigure(col, weight=1)
+        self.button_frame.rowconfigure(0, weight=1)
 
         # Left row of inputs
 
         self.control_frame = tkinter.Frame(self.root)
-        self.control_frame.grid(row=1, column=0, sticky="n")
+        self.control_frame.grid(row=1, column=0, sticky=tkinter.N + tkinter.S,
+                                padx=5, pady=5)
 
         tkinter.Label(self.control_frame, text="Accumulator:").grid(row=0,
                                                                     column=0,
                                                                     sticky="w")
 
-        self.accumulator = tkinter.Listbox(self.control_frame, setgrid=True,
-                                           height=1, width=5)
+        self.accumulator_var = tkinter.StringVar(value="000")
+        vcmd = self.root.register(self.accumulator_changed), "%P", "%V"
+        self.accumulator = mn = tkinter.Entry(self.control_frame, width=5, bg=DEFAULT, borderwidth=0, textvar=self.accumulator_var,
+                                              vcmd=vcmd, validate="all")
         self.accumulator.grid(row=0, column=1)
-        self.accumulator.insert(tkinter.END, 0)
 
         tkinter.Label(self.control_frame, text="Counter:").grid(row=1,
                                                                 column=0,
                                                                 sticky="w")
 
-        self.counter = tkinter.Listbox(self.control_frame, setgrid=True,
-                                       height=1, width=5)
+        self.counter_var = tkinter.StringVar(value="000")
+        vcmd = self.root.register(self.counter_changed), "%P", "%V"
+        self.counter = tkinter.Entry(self.control_frame, width=5, bg=DEFAULT, borderwidth=0, textvar=self.counter_var,
+                                     vcmd=vcmd, validate="all")
         self.counter.grid(row=1, column=1)
-        self.counter.insert(tkinter.END, 0)
 
         tkinter.Label(self.control_frame, text="Input:").grid(row=2,
                                                               column=0,
@@ -264,10 +283,21 @@ class RunGUI:
         self.speed_scale.set(0.01)
         self.speed_scale.grid(row=4, column=1, columnspan=2)
 
+        for x in range(3):
+            self.control_frame.columnconfigure(x, weight=1)
+        for y in range(5):
+            self.control_frame.rowconfigure(y, weight=1)
+
         # Memory display on right
 
-        self.memory_frame = MemoryDisplay(self.root, self.setmem)
-        self.memory_frame.grid(row=1, column=1)
+        self.memory_frame = MemoryDisplay(self.root, self.setmem, self.update_memory)
+        self.memory_frame.grid(row=1, column=1, sticky=STICKY_NESW,
+                               padx=5, pady=5)
+
+        # Make resizeable
+
+        self.root.columnconfigure(1, weight=1)
+        self.root.rowconfigure(1, weight=1)
 
         self.root.after(1, self.run_halt_check)  # Kick off
 
@@ -276,6 +306,34 @@ class RunGUI:
                                     halt_for_inp=True)
         self.root.title("yaplmc - " + fname)
         self.update_memory()
+
+    def accumulator_changed(self, num, reason):
+        if reason == "key":
+            ok, num = check_num(num)
+            if not hasattr(self, "runner") or not ok:
+                return False
+            self.runner.setaccum(num)
+            self.set_colors()
+        elif reason == "focusout":
+            self.root.after(0, self.update_memory)
+        return True
+
+    def counter_changed(self, num, reason):
+        if reason == "key":
+            if not hasattr(self, "runner") or len(num) > 3:
+                return False
+            if num == "":
+                num = "0"
+            try:
+                if not int(num) in range(1000):
+                    return False
+            except ValueError:
+                return False
+            self.runner.counter = int(num)
+            self.set_colors()
+        elif reason == "focusout":
+            self.root.after(0, self.update_memory)
+        return True
 
     def run_wrapper(self, func):
         if self.getting_inp:
@@ -345,10 +403,8 @@ class RunGUI:
 
     def update_memory(self):
         self.memory_frame.update_memory(self.runner.memory)
-        self.accumulator.delete(tkinter.END)
-        self.accumulator.insert(tkinter.END, self.runner.accumulator)
-        self.counter.delete(tkinter.END)
-        self.counter.insert(tkinter.END, self.runner.counter)
+        self.accumulator_var.set(str(self.runner.accumulator).zfill(3))
+        self.counter_var.set(str(self.runner.counter).zfill(3))
         self.set_colors()
 
     def give_output(self, i, err=False):
@@ -368,6 +424,8 @@ class RunGUI:
     def check_input(self, num):
         if num in ("", "-"):
             return True
+        if len(num) > 4 or len(num) > 3 and not num.startswith("-"):
+            return False
         try:
             return int(num) in range(-500, 500)
         except ValueError:
@@ -434,7 +492,7 @@ under certain conditions. Type `yaplmc --licence` for details.
         print("yaplmc", __version__)
         exit()
     r = RunGUI()
-    code, fname = get_assembled_code(args_from_parser.file, r.root)
-    if code:
-        r.set_code(code, fname)
+    a = AssembleGUI(args_from_parser.file, r.root)
+    if a.code:
+        r.set_code(a.code, a.fname)
         tkinter.mainloop()
