@@ -139,18 +139,20 @@ HALT_REASON_STEP = 2
 
 class Runner:
     def __init__(self, program, get_input=None, halt_for_inp=False,
-                 give_output=None, debug_output=None, debug_level=0):
+                 give_output=None, debug_output=None,
+                 unfiltered_debug_output=None, debug_level=0):
         self.code = program
         self.get_input = get_input if get_input else self._get_input
         self.give_output = give_output if give_output else self._give_output
         self.halt_for_inp = halt_for_inp
         self.debug_level = debug_level
-        self.unfiltered_debug_output = debug_output or self._debug_output
+        self.debug_output = unfiltered_debug_output or self.filter_debug_output
+        self.fdebug_output = debug_output or self._debug_output
         self.reset()
 
-    def debug_output(self, msg, level):
+    def filter_debug_output(self, msg, level):
         if level <= self.debug_level:
-            self.unfiltered_debug_output(msg)
+            self.fdebug_output(msg)
 
     def cap(self, i):
         return (i + 1000) % 1000
