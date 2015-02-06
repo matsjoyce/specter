@@ -207,25 +207,30 @@ class RunGUI:
 
         self.run_to_hlt_btn = tkinter.Button(self.button_frame,
                                              text="Run to halt",
-                                             command=self.run_to_hlt, width=10)
-        self.run_to_hlt_btn.grid(row=0, column=0, sticky=tkinter.E + tkinter.W)
+                                             command=self.run_to_hlt)
+        self.run_to_hlt_btn.grid(row=0, column=0, sticky=tkinter.E + tkinter.W,
+                                 padx=2, pady=2)
 
         self.run_step_btn = tkinter.Button(self.button_frame,
                                            text="Run one step",
-                                           command=self.next_step, width=10)
-        self.run_step_btn.grid(row=0, column=1, sticky=tkinter.E + tkinter.W)
+                                           command=self.next_step)
+        self.run_step_btn.grid(row=0, column=1, sticky=tkinter.E + tkinter.W,
+                               padx=2, pady=2)
 
         self.pause_btn = tkinter.Button(self.button_frame, text="Pause",
-                                        command=self.pause, width=10)
-        self.pause_btn.grid(row=0, column=2, sticky=tkinter.E + tkinter.W)
+                                        command=self.pause)
+        self.pause_btn.grid(row=0, column=2, sticky=tkinter.E + tkinter.W,
+                            padx=2, pady=2)
 
         self.reset_btn = tkinter.Button(self.button_frame, text="Reset",
-                                        command=self.reset, width=10)
-        self.reset_btn.grid(row=0, column=3, sticky=tkinter.E + tkinter.W)
+                                        command=self.reset)
+        self.reset_btn.grid(row=0, column=3, sticky=tkinter.E + tkinter.W,
+                            padx=2, pady=2)
 
         self.exit_btn = tkinter.Button(self.button_frame, text="Exit",
-                                       command=self.exit, width=10)
-        self.exit_btn.grid(row=0, column=4, sticky=tkinter.E + tkinter.W)
+                                       command=self.exit)
+        self.exit_btn.grid(row=0, column=4, sticky=tkinter.E + tkinter.W,
+                           padx=2, pady=2)
 
         for col in range(5):
             self.button_frame.columnconfigure(col, weight=1)
@@ -273,6 +278,7 @@ class RunGUI:
                                    state="disabled",
                                    validate="key", vcmd=vcmd)
         self.input.grid(row=0, column=0, padx=10, pady=5)
+        self.input.bind("<Return>", self.got_input)
 
         self.input_btn = tkinter.Button(self.input_frame, text="Submit",
                                         command=self.got_input,
@@ -525,7 +531,7 @@ class RunGUI:
         self.input["state"] = "normal"
         self.input_btn["state"] = "normal"
 
-    def got_input(self):
+    def got_input(self, *args):
         i = self.input_var.get()
         self.input_var.set("")
         self.input["state"] = "disabled"
