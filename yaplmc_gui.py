@@ -175,17 +175,21 @@ class AssembleGUI(simpledialog.Dialog):
             t.insert(tkinter.END, code)
             t.pack()
 
+    def cancel_(self, *args):
+        self.code = self.fname = None
+        super().cancel(*args)
+
     def buttonbox(self):
         box = tkinter.Frame(self)
 
         if self.code:
-            b = tkinter.Button(box, text="Run", command=self.cancel)
+            b = tkinter.Button(box, text="Run", command=self.ok)
             b.pack(side=tkinter.LEFT)
-        b = tkinter.Button(box, text="Exit", command=self.cancel)
+        b = tkinter.Button(box, text="Exit", command=self.cancel_)
         b.pack(side=tkinter.LEFT)
 
-        self.bind("<Return>", self.ok if self.code else self.cancel)
-        self.bind("<Escape>", self.cancel)
+        self.bind("<Return>", self.ok if self.code else self.cancel_)
+        self.bind("<Escape>", self.cancel_)
         box.pack()
 
 
@@ -359,7 +363,7 @@ class RunGUI:
 
         # Make resizeable
 
-        self.root.columnconfigure(1, weight=3)
+        self.root.columnconfigure(1, weight=2)
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(1, weight=1)
 
