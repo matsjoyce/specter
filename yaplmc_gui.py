@@ -164,16 +164,22 @@ class AssembleGUI(simpledialog.Dialog):
             self.code = None
             tkinter.Label(self.root, text="Assembly failed!\nError:").pack()
 
-            t = tkinter.Text(self.root)
+            t = tkinter.Text(self.root, bg="white")
             t.insert(tkinter.END, e.args[0])
+
+            bold_font = tkfont.Font(t, t.cget("font"))
+            bold_font["weight"] = "bold"
+            t.config(font=bold_font, foreground="red")
             t.pack()
+            t["state"] = "disabled"
         else:
             tkinter.Label(self.root, text="Assembly succeeded!\nCode:").pack()
 
-            t = tkinter.Text(self.root)
+            t = tkinter.Text(self.root, bg="white")
             code = " ".join(str(i).zfill(3) for i in self.code[:code_length])
             t.insert(tkinter.END, code)
             t.pack()
+            t["state"] = "disabled"
 
     def cancel_(self, *args):
         self.code = self.fname = None
