@@ -1,9 +1,0 @@
-# Add two numbers
-
-        INP
-        STA FIRST
-        INP
-        ADD FIRST
-        OUT
-        HLT
-FIRST   DAT

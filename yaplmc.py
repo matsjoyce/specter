@@ -218,7 +218,7 @@ class Runner:
         addr = instruction % 100
         if instruction == 0:  # HLT
             self.debug_output("HLT", DEBUG_LEVEL_LOW)
-            self.give_output("Done! Coffee break!")
+            self.give_output("Done!")
             return HALT_REASON_HLT
         elif instruction < 100:
             raise RuntimeError("Invalid instruction {:03}".format(instruction))

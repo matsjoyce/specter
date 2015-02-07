@@ -472,7 +472,7 @@ class RunGUI:
             if i >= 500:
                 i = i - 1000
         i = str(i)
-        if i == "Done! Coffee break!":
+        if i == "Done!":
             self.all_output.append((i, "done"))
         else:
             self.all_output.append((i, type))
