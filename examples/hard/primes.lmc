@@ -1,5 +1,6 @@
 # Prime number finder. Prints all prime numbers less than 100.
 
+# Main checking loop. Check each number from 2 to 100.
 TLOOP   LDA NUM
 
 # Have we done all 100 numbers?
@@ -33,19 +34,11 @@ DLOOP   LDA DIV
 
 # Setup for divide function.
         LDA NUM
-        STA FIRST
 
-# Divide function: FIRST / SECOND.
-# Similar to divide.lmc, except we care about the remainder, not the quotient.
+# Modulus function: accumulator % DIV.
 
-DIVIDE  LDA FIRST
-        SUB DIV
-        STA FIRST
-        LDA RESULT
-        ADD ONE
-        STA RESULT
-        LDA FIRST
-        BRP DIVIDE
+MODULUS SUB DIV
+        BRP MODULUS
         ADD DIV
 
 # Remainder is now in the accumulator. If its zero, NUM is not prime.
@@ -55,6 +48,7 @@ DIVIDE  LDA FIRST
 # If its prime, print it.
 PRIME   LDA NUM
         OUT
+
 # Go back to the top.
 NPRIME  BRA TLOOP
 
@@ -63,9 +57,6 @@ HALT    HLT
 
 NUM     DAT 1
 DIV     DAT 1
-RESULT  DAT
-FIRST   DAT
-SECOND  DAT
 ONE     DAT 1
 FIFTY   DAT 50
 HUNDRED DAT 100
