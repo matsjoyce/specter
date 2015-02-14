@@ -1,10 +1,19 @@
-# Prime number finder. Prints all prime numbers less than 100.
+# Prime number finder. Prints all prime numbers between the numbers the user inputs (min, then max).
 
-# Main checking loop. Check each number from 2 to 100.
+# Min
+        INP
+        SUB ONE
+        STA NUM
+
+# Max
+        INP
+        STA MAX
+
+# Main checking loop. Check each number from NUM to MAX.
 TLOOP   LDA NUM
 
-# Have we done all 100 numbers?
-        SUB HUNDRED
+# Have we done all MAX numbers?
+        SUB MAX
         BRZ HALT
 
 # Increment to next number to check.
@@ -16,16 +25,12 @@ TLOOP   LDA NUM
         LDA ONE
         STA DIV
 
-# Check NUM for primeness by dividing all numbers from 2 to 50 into it.
+# Check NUM for primeness by dividing all numbers from 2 to NUM - 1 into it.
 DLOOP   LDA DIV
 
 # Increment to next divisor.
         ADD ONE
         STA DIV
-
-# Have we checked up to fifty?
-        SUB FIFTY
-        BRZ PRIME
 
 # Have we checked up to the number itself?
         LDA DIV
@@ -58,5 +63,4 @@ HALT    HLT
 NUM     DAT 1
 DIV     DAT 1
 ONE     DAT 1
-FIFTY   DAT 50
-HUNDRED DAT 100
+MAX     DAT
