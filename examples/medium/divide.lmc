@@ -1,4 +1,4 @@
-# Divide (floor, not rounded) first input by second input. Does not work with negative numbers.
+# Divide (floor, not rounded, but with remainder) first input by second input. Does not work with negative numbers.
 
         INP
         STA FIRST
@@ -15,8 +15,12 @@ START   LDA FIRST
         BRP START
         LDA RESULT
         SUB ONE     # Subtract one, as BRP considers 0 as positive, and so overshoots
-        OUT
+        OUT         # Print quotient
+        LDA FIRST
+        ADD SECOND
+        OUT         # Print remainder
         HLT
+
 RESULT  DAT
 FIRST   DAT
 SECOND  DAT
