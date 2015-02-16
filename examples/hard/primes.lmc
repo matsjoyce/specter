@@ -1,4 +1,4 @@
-# Prime number finder. Prints all prime numbers between the numbers the user inputs (min, then max).
+# Prime number finder. Prints all prime numbers between the numbers the user inputs (min, then max exclusive).
 
 # Min
         INP
@@ -12,14 +12,13 @@
 # Main checking loop. Check each number from NUM to MAX.
 TLOOP   LDA NUM
 
+# Increment to next number to check.
+        ADD ONE
+        STA NUM
+
 # Have we done all MAX numbers?
         SUB MAX
         BRZ HALT
-
-# Increment to next number to check.
-        LDA NUM
-        ADD ONE
-        STA NUM
 
 # Reset divisor.
         LDA ONE
@@ -33,7 +32,6 @@ DLOOP   LDA DIV
         STA DIV
 
 # Have we checked up to the number itself?
-        LDA DIV
         SUB NUM
         BRZ PRIME
 
@@ -41,26 +39,30 @@ DLOOP   LDA DIV
         LDA NUM
 
 # Modulus function: accumulator % DIV.
-
 MODULUS SUB DIV
         BRP MODULUS
+
+# As BRP takes 0 as positive, it overshoots. Correct that by going back one cycle.
         ADD DIV
 
-# Remainder is now in the accumulator. If its zero, NUM is not prime.
+# Modulus is now in the accumulator. If its zero, NUM is not prime.
         BRZ NPRIME
+
+# Otherwise, continue.
         BRA DLOOP
 
 # If its prime, print it.
 PRIME   LDA NUM
         OUT
 
-# Go back to the top.
+# Not prime, so back to the top.
 NPRIME  BRA TLOOP
 
 # End of program.
 HALT    HLT
 
-NUM     DAT 1
-DIV     DAT 1
-ONE     DAT 1
+# Variables.
+NUM     DAT
+DIV     DAT
 MAX     DAT
+ONE     DAT 1
