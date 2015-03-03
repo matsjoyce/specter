@@ -17,6 +17,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import tkinter
+from tkinter import (filedialog as fdialog, scrolledtext as stext,
+                     simpledialog, font as tkfont)
+import yaplmc
+import math
+from functools import partial
+
 __author__ = "Matthew Joyce"
 __copyright__ = "Copyright 2013"
 __credits__ = ["Matthew Joyce"]
@@ -25,13 +32,6 @@ __version__ = "1.1.0"
 __maintainer__ = "Matthew Joyce"
 __email__ = "matsjoyce@gmail.com"
 __status__ = "Development"
-
-import tkinter
-from tkinter import (filedialog as fdialog, scrolledtext as stext,
-                     simpledialog, font as tkfont)
-import yaplmc
-import math
-from functools import partial
 
 CHANGEDN = "#C00"
 CHANGED = "#E00"

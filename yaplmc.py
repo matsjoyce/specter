@@ -17,6 +17,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import assembler
+
 __author__ = "Matthew Joyce"
 __copyright__ = "Copyright 2013"
 __credits__ = ["Matthew Joyce"]
@@ -25,107 +27,6 @@ __version__ = "1.1.0"
 __maintainer__ = "Matthew Joyce"
 __email__ = "matsjoyce@gmail.com"
 __status__ = "Development"
-
-instructions = {"ADD": "1xx",
-                "SUB": "2xx",
-                "STA": "3xx",
-                "LDA": "5xx",
-                "BRA": "6xx",
-                "BRZ": "7xx",
-                "BRP": "8xx",
-                "INP": "901",
-                "OUT": "902",
-                "HLT": "000",
-                "DAT": None
-                }
-
-
-def add_arg(memo, arg, lineno, line):
-    instr = instructions[memo]
-    if arg:
-        if len(arg) > 2 or not arg.isdigit():
-            raise SyntaxError("Bad argument on line {}: '{}'"
-                              .format(lineno + 1, arg))
-    if arg:
-        arg = arg.zfill(2)
-    if "xx" in instr:
-        if not arg:
-            raise SyntaxError("Instruction on line {} "
-                              "takes an argument: '{}'".format(lineno + 1,
-                                                               memo))
-        return instr.replace("xx", arg)
-    if arg:
-        raise SyntaxError("Instruction on line {} "
-                          "has no argument: '{}'".format(lineno + 1, memo))
-    return instr
-
-
-def assemble(lines):
-    labels = {}
-    instrs = []
-    # Turn list of lines into list of (instruction, argument)
-    i = 0
-    for lineno, origline in enumerate(lines):
-        line = origline
-        if "#" in line:
-            line = line[:line.find("#")]
-        line = line.strip()
-        if not line:
-            continue
-        line = line.split()
-        if len(line) == 3:
-            label, instr, arg = line
-        elif len(line) == 2:
-            if line[0] in instructions:
-                instr, arg = line
-                label = None
-            else:
-                label, instr = line
-                arg = None
-        elif len(line) == 1:
-            instr = line[0]
-            label = arg = None
-        else:
-            raise SyntaxError("Invalid line {}: '{}'".format(lineno + 1,
-                                                             origline))
-        instr = instr.upper()
-        if instr not in instructions:
-            raise SyntaxError("Invalid mnemonic at line {}:"
-                              " '{}'".format(lineno + 1, instr))
-        if label:
-            if label in labels:
-                orig_line = instrs[labels[label]][3] + 1
-                raise SyntaxError("Duplicate label '{}' "
-                                  "on lines {} and {}".format(label,
-                                                              lineno + 1,
-                                                              orig_line))
-            labels[label] = i
-        instrs.append((instr, arg, origline, lineno))
-        i += 1
-    # resolve arguments and assemble
-    assembled = []
-    for instr, arg, line, lineno in instrs:
-        if instr == "DAT":
-            if arg:
-                if set(arg) - set("1234567890-") \
-                   or int(arg) not in range(-500, 500):
-                    raise SyntaxError("Bad argument on line {}: '{}'"
-                                      .format(lineno + 1, arg))
-                i = int(arg)
-                arg = 1000 + i if i < 0 else i
-            else:
-                arg = 0
-            assembled.append(arg)
-        else:
-            if arg in labels:
-                arg = str(labels[arg])
-            assembled.append(int(add_arg(instr, arg, lineno, line)))
-    l = len(assembled)
-    if l > 100:
-        raise RuntimeError("Code is too large")
-    while len(assembled) != 100:
-        assembled.append(0)
-    return assembled, l
 
 DEBUG_LEVEL_NONE = 0
 DEBUG_LEVEL_LOW = 1
@@ -335,12 +236,16 @@ under certain conditions. Type `yaplmc --licence` for details.
     else:
         code = open(input("Filename: ")).read().split("\n")
     print("Assembling...")
-    try:
-        machine_code, code_length = assemble(code)
-    except SyntaxError as e:
+    assembler_ = assembler.Assembler()
+    assembler_.update_code(code)
+    assembler_.assemble()
+    for problem in assembler_.problems():
+        print(problem.show(code))
+        print()
+    if assembler_.in_error:
         print("Assembly failed")
-        print("Error:", e.args[0])
         exit(1)
+    machine_code, code_length = assembler_.machine_code, assembler_.machine_code_length
     print("Assembly successful")
     if args_from_parser.debug:
         print("Code:")
