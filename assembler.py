@@ -1,6 +1,8 @@
 import abc
 import string
 
+import problems
+
 # Tuples in the form (numeric code, short description, long description)
 # from wiki
 MNEMONIC_INFO = {
@@ -45,42 +47,8 @@ class Position:
         out.append("    " + " " * self.start_index + "^" * self.length)
         return "\n".join(out)
 
-
-class CodeProblem:
-    def __init__(self, msg, position, name, extra=None):
-        self.msg = msg
-        self.position = position
-        self.name = name
-        if isinstance(extra, list):
-            self.extra = extra
-        elif extra is None:
-            self.extra = []
-        else:
-            self.extra = [extra]
-
-    def set_info(self, textbox):
-        pass
-
-    def show(self, codelines):
-        out = """{}
-{}: {}""".format(self.position.get_descriptive_line(codelines), self.name, self.msg)
-        for msg, pos in self.extra:
-            out += "\n\n" + pos.get_descriptive_line(codelines, msg + " on line {}:")
-        return out
-
-
-class CodeError(CodeProblem):
-    pass
-
-
-class InvalidSyntax(CodeError):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, name="Invalid Syntax", **kwargs)
-
-
-class CodeWarning(CodeProblem):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, name="Warning", **kwargs)
+    def __str__(self):
+        return "Position({}, {}, {})".format(self.lineno, self.start_index, self.end_index)
 
 
 class Token:
@@ -92,7 +60,7 @@ class Token:
 
     @property
     def in_error(self):
-        return any(isinstance(problem, CodeError) for problem in self.problems)
+        return any(isinstance(problem, problems.Error) for problem in self.problems)
 
     def show_problems(self, codelines):
         return "\n\n".join(problem.show(codelines) for problem in self.problems)
@@ -101,7 +69,10 @@ class Token:
         return "<{}({}) {!r}>".format(self.__class__.__name__, self.style,
                                       self.text)
 
-    def set_info(self, textbox):
+
+class InteractiveToken(Token, abc.ABC):
+    @abc.abstractmethod
+    def set_interactive(self, tooltip):
         pass
 
 
@@ -110,12 +81,13 @@ class Comment(Token):
         super().__init__(*args, style="comment", **kwargs)
 
 
-class Mnemonic(Token):
+class Mnemonic(InteractiveToken):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, style="mnemonic", **kwargs)
         self.mnemonic = self.text.upper()
         self.numeric, self.short, self.long = MNEMONIC_INFO[self.mnemonic]
         self.arg = None
+        self.address = None
 
     def link_arg(self, arg):
         self.arg = arg
@@ -139,20 +111,49 @@ class Mnemonic(Token):
     def needs_arg(self):
         return "x" in self.numeric and not self.numeric == "xxx"  # DAT has an optional arg
 
-    def set_info(self, textbox):
-        super().set_info(textbox)
+    def set_interactive(self, tooltip):
+        tooltip.type("mnemonic")
+        tooltip.value(self.text)
+        tooltip.newline()
+
+        tooltip.text("Machine instruction:")
+        mi = self.machine_instruction()
+        if mi is not None and self.takes_arg:
+            tooltip.number("{:03}".format(mi))
+            tooltip.text("(", space=False)
+            tooltip.number(self.numeric, space=False)
+            tooltip.text(")")
+        else:
+            tooltip.number(self.numeric)
+        tooltip.newline()
+
+        if self.address is not None:
+            tooltip.text("Address:")
+            tooltip.number("{:03}".format(self.address))
+            tooltip.newline()
+
+        tooltip.newline()
+        tooltip.text(self.long)
+        tooltip.newline()
 
 
-class Label(Token):
+class Label(InteractiveToken):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, style="label", **kwargs)
         self.address = None
 
-    def set_info(self, textbox):
-        super().set_info(textbox)
+    def set_interactive(self, tooltip):
+        tooltip.type("label definition")
+        tooltip.value(self.text)
+        tooltip.newline()
+
+        if self.address is not None:
+            tooltip.text("Address:")
+            tooltip.number("{:03}".format(self.address))
+            tooltip.newline()
 
 
-class Argument(Token, abc.ABC):
+class Argument(InteractiveToken):
     def __init__(self, *args, **kwargs):
         abc.ABC.__init__(self)
         Token.__init__(self, *args, **kwargs)
@@ -164,17 +165,29 @@ class Argument(Token, abc.ABC):
 
 class LabelRef(Argument):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, style="label", **kwargs)
+        super().__init__(*args, style="labelref", **kwargs)
         self.label = None
 
     def link_label(self, label):
         self.label = label
 
-    def set_info(self, textbox):
-        super().set_info(textbox)
+    def set_interactive(self, tooltip):
+        tooltip.type("label (argument)")
+        tooltip.value(self.text)
+        tooltip.newline()
+
+        if self.label is not None:
+            if self.resolve() is not None:
+                tooltip.text("Value:")
+                tooltip.number("{:03}".format(self.resolve()))
+                tooltip.newline()
+
+            tooltip.text("Defined at:")
+            tooltip.goto_token(self.label)
+            tooltip.newline()
 
     def resolve(self):
-        return self.label.address
+        return self.label.address if self.label else None
 
 
 class Number(Argument):
@@ -186,17 +199,28 @@ class Number(Argument):
     def resolve(self):
         return self.capped_value
 
+    def set_interactive(self, tooltip):
+        tooltip.type("number (argument)")
+        tooltip.value(self.text)
+        tooltip.newline()
+
+        tooltip.text("Value:")
+        tooltip.number("{:03}".format(self.capped_value))
+        tooltip.newline()
+
 
 class Assembler:
     def __init__(self):
         self.tokenised = self.parsed = self.assembled = False
 
     def update_code(self, code):
-        if isinstance(code, str):
-            self.code = code.split("\n")
-        else:
-            self.code = list(code)
+        self.raw_code = code
+        self.code = code.split("\n")
         self.tokenised = self.parsed = self.assembled = False
+
+    @property
+    def tokens(self):
+        return [token for line in self.parsed_code for token in line]
 
     def tokenise(self):
         if self.tokenised:
@@ -242,53 +266,57 @@ class Assembler:
                 start_index = end_index
                 end_index = start_index + len(token)
                 position = Position(lineno, start_index, end_index)
-                problems = []
+                tok_problems = []
                 if token and (token[0].isalnum() or token[0] == "-"):
                     if token.upper() in MNEMONIC_INFO:
                         if found_mnem:
-                            problems.append(InvalidSyntax("Multiple mnemonics on one line", position))
+                            tok_problems.append(problems.SyntaxError("Multiple mnemonics on one line", position))
                         if not token.isupper():
-                            problems.append(CodeWarning("Mnemonics should be uppercase", position))
-                        parsed_line.append(Mnemonic(token, position, problems=problems))
+                            tok_problems.append(problems.StyleWarning("Mnemonics should be uppercase", position))
+                        parsed_line.append(Mnemonic(token, position, problems=tok_problems))
                         found_mnem = True
                     elif found_mnem:
                         if found_arg:
-                            problems.append(InvalidSyntax("Multiple arguments for mnemonic", position))
+                            tok_problems.append(problems.SyntaxError("Multiple arguments for mnemonic", position))
                         try:
                             int(token)
                         except ValueError:
-                            parsed_line.append(LabelRef(token, position, problems=problems))
+                            parsed_line.append(LabelRef(token, position, problems=tok_problems))
                         else:
                             if int(token) > 499:
-                                problems.append(InvalidSyntax("Number too large (> 499)", position))
+                                tok_problems.append(problems.SemanticError("Number too large (> 499)", position))
                             if int(token) < -500:
-                                problems.append(InvalidSyntax("Number too small (< -500)", position))
-                            parsed_line.append(Number(token, position, problems=problems))
+                                tok_problems.append(problems.SemanticError("Number too small (< -500)", position))
+                            parsed_line.append(Number(token, position, problems=tok_problems))
                         found_arg = True
                     else:
                         if found_label:
-                            problems.append(InvalidSyntax("Multiple labels for one line", position))
+                            tok_problems.append(problems.SyntaxError("Multiple labels for one line", position))
                         if token in self.labels:
-                            original_pos = self.labels[token][1].position
-                            problems.append(InvalidSyntax("Duplicate label", position, extra=("First defined", original_pos)))
-                        l = Label(token, position, problems=problems)
-                        self.labels[token] = (None, l)
+                            linked_token = self.labels[token][1]
+                            tok_problems.append(problems.SemanticError("Label already defined", position, extra=("First defined", linked_token)))
+                        l = Label(token, position, problems=tok_problems)
+                        if token not in self.labels:
+                            self.labels[token] = (None, l)
                         parsed_line.append(l)
                         found_label = True
                 elif token.startswith("#"):
-                    parsed_line.append(Comment(token, position, problems=problems))
+                    parsed_line.append(Comment(token, position, problems=tok_problems))
                 else:
-                    parsed_line.append(Token(token, position, problems=problems))
+                    parsed_line.append(Token(token, position, problems=tok_problems))
             self.parsed_code.append(parsed_line)
         # Check for missing labels etc. which can't be checked above
+        self.instructions = []
         for line in self.parsed_code:
             for token in line:
                 if isinstance(token, LabelRef):
                     if token.text not in self.labels:
-                        token.problems.append(InvalidSyntax("Label not defined", token.position))
+                        token.problems.append(problems.SemanticError("Label not defined", token.position))
                     else:
                         token.link_label(self.labels[token.text][1])
                 elif isinstance(token, Mnemonic):
+                    token.address = len(self.instructions)
+                    self.instructions.append(token)
                     found_arg = False
                     for arg in line:
                         if isinstance(arg, Argument):
@@ -298,10 +326,32 @@ class Assembler:
                         if token.takes_arg:
                             token.link_arg(arg)
                         elif not token.needs_arg:
-                            token.problems.append(InvalidSyntax("Mnemonic does not take an argument", token.position))
+                            token.problems.append(problems.SyntaxError("Mnemonic does not take an argument", token.position))
                     else:
                         if token.needs_arg:
-                            token.problems.append(InvalidSyntax("Mnemonic takes an argument", token.position))
+                            token.problems.append(problems.SyntaxError("Mnemonic takes an argument", token.position))
+                elif isinstance(token, Label):
+                    token.address = len(self.instructions)
+
+        if not any(isinstance(token, Mnemonic) and token.mnemonic == "HLT" for token in self.tokens):
+            self.tokens[-1].problems.append(problems.RuntimeWarning("No HLT instruction", self.tokens[-1].position))
+
+        for bra in filter(lambda tok: tok.mnemonic == "BRA", self.instructions):
+            if bra.arg and isinstance(bra.arg, (LabelRef, Number)) and bra.arg.resolve() is not None:
+                for mnem in self.instructions[bra.arg.resolve():bra.address]:
+                    if mnem.mnemonic in ("BRP", "BRZ", "BRA"):
+                        break
+                else:
+                    bra.problems.append(problems.RuntimeWarning("Possible infinite loop", bra.position, extra=("Starting at", self.instructions[bra.arg.resolve()])))
+
+        for instr in filter(lambda tok: tok.mnemonic != "DAT", self.instructions):
+            print(instr, instr.arg)
+            if instr.arg and isinstance(instr.arg, Number):
+                if instr.arg.capped_value >= len(self.instructions):
+                    instr.problems.append(problems.RuntimeWarning("Argument does not point at a initialised position", instr.position))
+                else:
+                    instr.problems.append(problems.StyleWarning("Use labels instead of numerical addresses", instr.position))
+
         self.in_error = any(token.in_error for line in self.parsed_code for token in line)
         self.parsed = True
         return self.parsed_code
@@ -309,21 +359,12 @@ class Assembler:
     def problems(self):
         return sum((token.problems for line in self.parsed_code for token in line), [])
 
-    def set_addresses(self):
-        address = 0
-        for line in self.parsed_code:
-            for token in line:
-                if isinstance(token, Label):
-                    token.address = address
-            address += any(isinstance(token, Mnemonic) for token in line)
-
     def assemble(self):
         if self.assembled:
             return self.machine_code
         self.parse()
         self.machine_code = []
         if not self.in_error:
-            self.set_addresses()
             for line in self.parsed_code:
                 for token in line:
                     if isinstance(token, Mnemonic):
@@ -333,6 +374,17 @@ class Assembler:
             self.machine_code.append(0)
         self.assembled = True
         return self.machine_code
+
+    def get_token_at(self, row, col):
+        self.parse()
+        line = self.parsed_code[row]
+        start = end = 0
+        for token in line:
+            start = end
+            end = start + len(token.text)
+            if start <= col < end:
+                return token
+        return None
 
 
 if __name__ == "__main__":

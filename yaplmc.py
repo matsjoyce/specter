@@ -232,9 +232,9 @@ under certain conditions. Type `yaplmc --licence` for details.
         exit()
 
     if args_from_parser.file:
-        code = open(args_from_parser.file).read().split("\n")
+        code = open(args_from_parser.file).read()
     else:
-        code = open(input("Filename: ")).read().split("\n")
+        code = open(input("Filename: ")).read()
     print("Assembling...")
     assembler_ = assembler.Assembler()
     assembler_.update_code(code)
