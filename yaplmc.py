@@ -245,7 +245,8 @@ under certain conditions. Type `yaplmc --licence` for details.
     if assembler_.in_error:
         print("Assembly failed")
         exit(1)
-    machine_code, code_length = assembler_.machine_code, assembler_.machine_code_length
+    machine_code, code_length = (assembler_.machine_code,
+                                 assembler_.machine_code_length)
     print("Assembly successful")
     if args_from_parser.debug:
         print("Code:")

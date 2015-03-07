@@ -1,9 +1,11 @@
 import tkinter
-from tkinter import scrolledtext as stext, font as tkfont
+from tkinter import scrolledtext as stext, font as tkfont, filedialog, ttk, messagebox
 import functools
 import collections
 import assembler
+import itertools
 import re
+import os
 
 
 # Colors from Kate theme
@@ -11,8 +13,18 @@ LABEL_COLOR = "#006E28"
 COMMENT_COLOR = "#898887"
 NUMBER_COLOR = "#B08000"
 HIGHLIGHT_COLOR = "#FBFA96"
+ERROR_COLOR = "#BF0303"
+WARNING_COLOR = "#CA9219"
 
-HOVER_TIME = 500 * 2
+HOVER_TIME = 500
+
+
+# itertools recipes
+def grouper(iterable, n, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
+    args = [iter(iterable)] * n
+    return itertools.zip_longest(*args, fillvalue=fillvalue)
 
 
 class TooltipContentInterface:
@@ -94,10 +106,10 @@ class Tooltip(tkinter.Toplevel):
             text_widget.tag_configure("value", font=bold_font)
             text_widget.tag_configure("number", foreground=NUMBER_COLOR)
             text_widget.tag_configure("link", font=underline_font, foreground="blue")
-            text_widget.tag_configure("error_h", font=bold_font, foreground="red")
-            text_widget.tag_configure("error_d", foreground="red")
-            text_widget.tag_configure("warning_h", font=bold_font, foreground="orange")
-            text_widget.tag_configure("warning_d", foreground="orange")
+            text_widget.tag_configure("error_h", font=bold_font, foreground=ERROR_COLOR)
+            text_widget.tag_configure("error_d", foreground=ERROR_COLOR)
+            text_widget.tag_configure("warning_h", font=bold_font, foreground=WARNING_COLOR)
+            text_widget.tag_configure("warning_d", foreground=WARNING_COLOR)
             self.orig_cursor = text_widget["cursor"]
             text_widget.tag_bind("link", "<Enter>", functools.partial(self.link_enter, text_widget))
             text_widget.tag_bind("link", "<Leave>", functools.partial(self.link_leave, text_widget))
@@ -129,6 +141,7 @@ class Tooltip(tkinter.Toplevel):
         text_widget["cursor"] = self.orig_cursor
 
     def enter(self, event):
+        print("TE")
         self.entered = True
 
     def leave(self, event):
@@ -138,7 +151,9 @@ class Tooltip(tkinter.Toplevel):
             self.destroy()
 
     def destroy_when_ready(self):
-        if not self.entered:
+        inside_self = (0 <= (self.winfo_pointerx() - self.winfo_rootx()) < self.winfo_width()
+                       and 0 <= (self.winfo_pointery() - self.winfo_rooty()) < self.winfo_height())
+        if not self.entered and not inside_self:
             self.withdraw()
             self.destroy()
         else:
@@ -207,17 +222,19 @@ class CustomText(tkinter.Text):
         self.insert_moved_callback = callable
 
 
-
 class CodeEditor(tkinter.Frame):
     def __init__(self, master):
         super().__init__(master)
 
         self.tooltip_token = self.tooltip = self.tooltip_reg = self.tooltip_xy = None
-        self.highlighted_token = self.highlight_reg = None
+        self.highlighted_tokens = []
+        self.highlight_reg = self.syntax_update_reg = None
 
         self.hovered_token_mode = "cursor"
 
-        self.text = CustomText(self, bg="white", wrap=tkinter.NONE)
+        self.fname = None
+
+        self.text = CustomText(self, bg="white", wrap=tkinter.NONE, undo=True)
         self.text.grid(column=0, row=0, sticky=tkinter.NE + tkinter.SW)
 
         self.vbar = tkinter.Scrollbar(self, command=self.text.yview)
@@ -256,44 +273,73 @@ class CodeEditor(tkinter.Frame):
                                 background="white")
         self.text.tag_configure("number", foreground=NUMBER_COLOR,
                                 background="white")
+        self.text.tag_raise("sel")  # Otherwise selecting a label, mnemonic, etc. will results in a white background
 
         self.text.bind("<Motion>", self.motion)
         self.text.bind("<Leave>", self.leave)
         self.text.bind("<Enter>", self.enter)
-        self.text._root().bind("<FocusOut>", self.leave)
-        self.text._root().bind("<FocusIn>", self.enter)
+        self.text.bind("<FocusOut>", self.leave)
+        self.text.bind("<FocusIn>", self.enter)
+        self.text.bind("<Control-d>", self.comment_line)
+        self.text.bind("<Control-D>", self.decomment_line)
         self.text.set_insert_moved_callback(self.insert_moved)
 
         self.tags = collections.defaultdict(list)
         self.token_to_tag = {}
         self.token_to_problem_tag = {}
 
-    def update_code(self, code):
-        self.assembler.update_code(code)
-        self.assembler.assemble()
-        self.tags.clear()
-        self.token_to_tag.clear()
+        self.set_name()
+
+    # File-based stuff
+
+    def open(self, fname=None):
+        print("open")
+        if not fname:
+            fname = filedialog.askopenfilename(parent=self, defaultextension=".lmc", filetypes=[("LMC files", ".lmc"), ("All files", "*")])
+        self.fname = fname
         self.text.delete("1.0", tkinter.END)
-        self.text.insert(tkinter.END, self.assembler.raw_code)
+        self.text.insert(tkinter.END, open(fname).read())
+        self.text.edit_reset()
+        self.text.edit_modified(False)
+        self.set_name()
         self.update_syntax()
 
+    def save(self, *discard):
+        print("save")
+        if not self.fname:
+            return self.saveas()
+        open(self.fname, "w").write(self.text.get("1.0", "end").rstrip("\n") + "\n")
+        self.text.edit_modified(False)
+        self.set_name()
+
+    def saveas(self, *discard):
+        print("saveas")
+        fname = filedialog.asksaveasfilename(parent=self, defaultextension=".lmc", filetypes=[("LMC files", ".lmc"), ("All files", "*")])
+        if fname:
+            self.fname = fname
+            self.save()
+
+    def close(self, *discard):
+        if self.text.edit_modified():
+            save = messagebox.askyesnocancel("File {} has unsaved changes. Save?".format(self.fname))
+            if save is None:
+                return False
+            elif save is True:
+                self.save()
+        return True
+
+    def reload(self, *discard):
+        if self.close():
+            self.open(self.fname)
+
+    # Syntax highlighting
+
     def create_tag(self, token):
-        if isinstance(token, assembler.Label):
-            name = "label_at_" + str(token.position)
-        if isinstance(token, assembler.LabelRef):
-            if token.label is not None:
-                name = "label_at_" + str(token.label.position)
-            else:
-                name = "labelref_at_" + str(token.position)
-        elif isinstance(token, assembler.Mnemonic):
-            name = "mnem_at_" + str(token.position)
-        elif isinstance(token, assembler.Number):
-            name = "num_at_" + str(token.position)
-        if name not in self.tags:
-            self.tags[name].clear()
-            self.text.tag_configure(name, background=HIGHLIGHT_COLOR,
-                                    foreground="black")
-            self.text.tag_lower(name)
+        name = "token_at_" + str(token.position)
+        self.tags[name].clear()
+        self.text.tag_configure(name, background=HIGHLIGHT_COLOR,
+                                foreground="black")
+        self.text.tag_lower(name)
         self.tags[name].append(token)
         self.token_to_tag[token] = name
         return name
@@ -301,13 +347,28 @@ class CodeEditor(tkinter.Frame):
     def create_problem_tag(self, token):
         if token.problems:
             pname = "problems_at_" + str(token.position)
-            self.token_to_problem_tag[pname] = token
+            self.token_to_problem_tag[token] = pname
             self.text.tag_configure(pname, font=self.underline_font,
-                                    foreground="red" if token.in_error else "orange")
+                                    foreground=ERROR_COLOR if token.in_error else WARNING_COLOR)
             self.text.tag_raise(pname)
             return pname
 
     def update_syntax(self):
+        self.dehighlight()
+        print("++++++++", self.text.tag_names())
+        for tag in self.token_to_tag.values():
+            print(tag)
+            self.text.tag_delete(tag)
+        for tag in self.token_to_problem_tag.values():
+            print(tag)
+            self.text.tag_delete(tag)
+        print("++++++++", self.text.tag_names())
+        for tag in self.text.tag_names():
+            self.text.tag_remove(tag, "1.0", tkinter.END)
+        self.assembler.update_code(self.text.get("1.0", "end"))
+        self.assembler.assemble()
+        self.tags.clear()
+        self.token_to_tag.clear()
         for line in self.assembler.parsed_code:
             for token in line:
                 start = "{}.{}".format(token.position.lineno + 1,
@@ -320,6 +381,29 @@ class CodeEditor(tkinter.Frame):
                 p = self.create_problem_tag(token)
                 if p:
                     self.text.tag_add(p, start, end)
+        self.highlight()
+
+    def start_syntax_update_timer(self):
+        if self.syntax_update_reg is not None:
+            self.stop_syntax_update_timer()
+        print("Starting syn_up timer")
+        self.syntax_update_reg = self.after(HOVER_TIME, self.update_syntax)
+
+    def stop_syntax_update_timer(self):
+        print("Stopped syn_up timer")
+        self.after_cancel(self.syntax_update_reg)
+        self.syntax_update_reg = None
+
+    # Highlighting and tooltip utils
+
+    def get_tags_at_index(self, index, tags=None):
+        tags = self.text.tag_names() if tags is None else tags
+        ret = []
+        for tag in tags:
+            for start, end in grouper(self.text.tag_ranges(tag), 2):
+                if self.text.compare(start, "<=", index) and self.text.compare(index, "<", end):
+                    ret.append(tag)
+        return ret
 
     def get_hovered_token(self):
         if self.hovered_token_mode == "cursor":
@@ -328,11 +412,25 @@ class CodeEditor(tkinter.Frame):
                 print("ght: pointer outside widget")
                 return
             print("ght: pointer !outside widget")
-            row, col = map(int, self.text.index("current").split("."))
-            return self.assembler.get_token_at(row - 1, col)
+            tag = self.get_tags_at_index("current", self.token_to_tag.values())
+            if len(tag) > 1:
+                print("Hum...", tag)
+            if not tag:
+                return
+            tag = tag[0]
+            pos = assembler.Position.from_string(tag.replace("token_at_", ""))
+            print(tag, pos)
+            return self.assembler.get_token_at(pos)
         else:
-            row, col = map(int, self.text.index("insert").split("."))
-            return self.assembler.get_token_at(row - 1, col)
+            tag = self.get_tags_at_index("insert", self.token_to_tag.values())
+            if len(tag) != 1:
+                print("Hum...", tag)
+            if not tag:
+                return
+            tag = tag[0]
+            pos = assembler.Position.from_string(tag.replace("token_at_", ""))
+            print(tag, pos)
+            return self.assembler.get_token_at(pos)
 
     # Highlighting functions
 
@@ -345,21 +443,29 @@ class CodeEditor(tkinter.Frame):
         force = force or self.highlight_force
         token = self.get_hovered_token()
         if isinstance(token, assembler.InteractiveToken):
-            if self.highlighted_token:
-                self.dehighlight()
+            self.dehighlight()
             print("Highlighting", token)
             self.text.tag_raise(self.token_to_tag[token])
-            self.highlighted_token = token
+            self.highlighted_tokens.append(token)
+            if isinstance(token, assembler.Label):
+                for i in token.refs:
+                    self.text.tag_raise(self.token_to_tag[i])
+                    self.highlighted_tokens.append(i)
+            elif isinstance(token, assembler.LabelRef) and token.label:
+                self.text.tag_raise(self.token_to_tag[token.label])
+                self.highlighted_tokens.append(token.label)
+                for i in token.label.refs:
+                    self.text.tag_raise(self.token_to_tag[i])
+                    self.highlighted_tokens.append(i)
         else:
-            if self.highlighted_token and force:
+            if force:
                 self.dehighlight()
             print("Nothing to highlight", token)
 
     def dehighlight(self):
-        if self.highlighted_token is not None:
-            print("Dehighlighting", self.highlighted_token)
-            self.text.tag_lower(self.token_to_tag[self.highlighted_token])
-            self.highlighted_token = None
+        print("Dehighlighting", self.highlighted_tokens)
+        while self.highlighted_tokens:
+            self.text.tag_lower(self.token_to_tag[self.highlighted_tokens.pop()])
 
     def start_highlight_timer(self, force=False):
         if self.highlight_reg is not None:
@@ -380,9 +486,8 @@ class CodeEditor(tkinter.Frame):
             self.nuke_tooltip()
         if token and token.problems or isinstance(token, assembler.InteractiveToken):
             print("Making tooltip")
-            m = re.match("(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", self._root().geometry())
-            x, y = self.text.winfo_pointerx() - self.text.winfo_rootx(), self.text.winfo_pointery() - self.text.winfo_rooty()
-            pos = x + int(m.group(3)) + 30, y + int(m.group(4))
+            x, y = self.text.winfo_pointerx(), self.text.winfo_pointery()
+            pos = x + 20, y - 35
             interactives = sorted(token.problems, key=lambda prob: prob.cat)
             if isinstance(token, assembler.InteractiveToken):
                 interactives.append(token)
@@ -432,6 +537,18 @@ class CodeEditor(tkinter.Frame):
         self.highlight(force=True)
         self.nuke_tooltip()
         self.start_highlight_timer(force=True)
+        if stuff[1] != "mark":
+            self.start_syntax_update_timer()
+        self.set_name()
+        #self.after(1, self.do_thing)
+
+    #def do_thing(self):
+        #print("B")
+        #if self.text.edit_modified():
+            #self.text["background"] = "green"
+        #else:
+            #self.text["background"] = "white"
+        #print("A")
 
     def leave(self, event):
         print("Leave", event.x, event.y, self)
@@ -453,14 +570,53 @@ class CodeEditor(tkinter.Frame):
         if token in self.token_to_tag:
             self.highlight_tag(self.token_to_tag[token])
 
+    def set_name(self):
+        if self.fname:
+            name = os.path.relpath(self.fname, os.curdir)
+        else:
+            name = "New file"
+        if self.text.edit_modified():
+            name = "*[{}]".format(name)
+        if isinstance(self.master, ttk.Notebook):
+            print("SN go")
+            if str(self) in self.master.tabs():
+                print("SN do")
+                self.master.tab(self, text=name)
+
+    def comment_line(self, *discard):
+        print("CL")
+        current_line = self.text.index("insert").split(".")[0]
+        self.text.insert("{}.0".format(current_line), "# ")
+        return "break"
+
+    def decomment_line(self, *discard):
+        print("DCL")
+        current_line = self.text.index("insert").split(".")[0]
+        line = self.text.get("{}.0".format(current_line), "{}.end".format(current_line))
+        print(repr(line))
+        for i, c in enumerate(line):
+            if c == "#":
+                self.text.delete("{}.{}".format(current_line, i))
+                if i + 1 < len(line) and line[i + 1] == " ":
+                    self.text.delete("{}.{}".format(current_line, i))
+                break
+            elif c.isspace():
+                pass
+            else:
+                break
+        return "break"
 
 if __name__ == "__main__":
-    import sys
+    import sys, tkinter.ttk as ttk
     root = tkinter.Tk(className='ToolTip-demo')
-    ce = CodeEditor(root)
-    ce.update_code(open(sys.argv[1]).read())
-    ce.grid(sticky=tkinter.NE + tkinter.SW)
+    #ce.open(sys.argv[1])
+    t = ttk.Notebook(root)
+    t.grid(sticky=tkinter.NE + tkinter.SW)
+    ce = CodeEditor(t)
+    t.add(ce, text="Hi")
+    #ce.grid(sticky=tkinter.NE + tkinter.SW)
 
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)
+    ce.open()
     root.mainloop()

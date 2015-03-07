@@ -1,5 +1,6 @@
 import abc
 import string
+import re
 
 import problems
 
@@ -47,8 +48,20 @@ class Position:
         out.append("    " + " " * self.start_index + "^" * self.length)
         return "\n".join(out)
 
+    def __eq__(self, other):
+        return (isinstance(other, Position)
+                and self.lineno == other.lineno
+                and self.start_index == other.start_index
+                and self.end_index == other.end_index)
+
     def __str__(self):
-        return "Position({}, {}, {})".format(self.lineno, self.start_index, self.end_index)
+        return "Position({}, {}, {})".format(self.lineno, self.start_index,
+                                             self.end_index)
+
+    @classmethod
+    def from_string(self, s):
+        m = re.match(r"Position\((\d+), (\d+), (\d+)\)", s)
+        return Position(*map(int, m.groups()))
 
 
 class Token:
@@ -141,6 +154,7 @@ class Label(InteractiveToken):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, style="label", **kwargs)
         self.address = None
+        self.refs = []
 
     def set_interactive(self, tooltip):
         tooltip.type("label definition")
@@ -170,6 +184,7 @@ class LabelRef(Argument):
 
     def link_label(self, label):
         self.label = label
+        label.refs.append(self)
 
     def set_interactive(self, tooltip):
         tooltip.type("label (argument)")
@@ -305,7 +320,9 @@ class Assembler:
                 else:
                     parsed_line.append(Token(token, position, problems=tok_problems))
             self.parsed_code.append(parsed_line)
+
         # Check for missing labels etc. which can't be checked above
+
         self.instructions = []
         for line in self.parsed_code:
             for token in line:
@@ -333,6 +350,8 @@ class Assembler:
                 elif isinstance(token, Label):
                     token.address = len(self.instructions)
 
+        # Extra warnings
+
         if not any(isinstance(token, Mnemonic) and token.mnemonic == "HLT" for token in self.tokens):
             self.tokens[-1].problems.append(problems.RuntimeWarning("No HLT instruction", self.tokens[-1].position))
 
@@ -352,12 +371,28 @@ class Assembler:
                 else:
                     instr.problems.append(problems.StyleWarning("Use labels instead of numerical addresses", instr.position))
 
-        self.in_error = any(token.in_error for line in self.parsed_code for token in line)
+        last_dats = []
+        for instr in self.instructions:
+            if instr.mnemonic == "DAT":
+                last_dats.append(instr)
+            else:
+                for i in last_dats:
+                    i.problems.append(problems.StyleWarning("DAT not at end of program", i.position))
+                last_dats.clear()
+
+        for instr in filter(lambda tok: tok.mnemonic in ("LDA", "STA"), self.instructions):
+            if instr.arg and instr.arg.resolve():
+                if 0 <= instr.arg.resolve() < len(self.instructions):
+                    i = self.instructions[instr.arg.resolve()]
+                    if i.mnemonic != "DAT":
+                        instr.problems.append(problems.RuntimeWarning("{} will not {} a DAT instruction".format(instr.mnemonic, "store to" if instr.mnemonic == "STA" else "load from"), instr.position))
+
+        self.in_error = any(token.in_error for line in self.tokens)
         self.parsed = True
         return self.parsed_code
 
     def problems(self):
-        return sum((token.problems for line in self.parsed_code for token in line), [])
+        return sum((token.problems for line in self.tokens), [])
 
     def assemble(self):
         if self.assembled:
@@ -375,15 +410,19 @@ class Assembler:
         self.assembled = True
         return self.machine_code
 
-    def get_token_at(self, row, col):
+    def get_token_at(self, row, col=None):
         self.parse()
-        line = self.parsed_code[row]
-        start = end = 0
-        for token in line:
-            start = end
-            end = start + len(token.text)
-            if start <= col < end:
-                return token
+        if col is None and isinstance(row, Position):
+            line = self.parsed_code[row.lineno]
+            for token in line:
+                print(token.position, row, token.position == row)
+                if token.position == row:
+                    return token
+        else:
+            line = self.parsed_code[row]
+            for token in line:
+                if token.position.start_index <= col < token.position.end_index:
+                    return token
         return None
 
 
@@ -418,7 +457,8 @@ if __name__ == "__main__":
 
     pprint.pprint(a.parsed_code)
 
-    rerecode = "\n".join("".join(i.text for i in line) for line in a.parsed_code)
+    rerecode = "\n".join("".join(i.text for i in line)
+                         for line in a.parsed_code)
     if rerecode != code:
         sys.stdout.writelines(d.compare(code.splitlines(keepends=True),
                                         recode.splitlines(keepends=True)))
