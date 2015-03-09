@@ -264,8 +264,8 @@ class CodeEditor(tkinter.Frame):
         self.underline_bold_font = tkfont.Font(self.text, bold_font)
         self.underline_bold_font["underline"] = "1"
 
-        self.text.tag_configure("comment", foreground=COMMENT_COLOR)
-        self.text.tag_configure("text")
+        self.text.tag_configure("comment", foreground=COMMENT_COLOR, background="white")
+        self.text.tag_configure("text", background="white")
         self.text.tag_configure("mnemonic", font=bold_font, background="white")
         self.text.tag_configure("label", font=bold_font,
                                 foreground=LABEL_COLOR, background="white")
@@ -282,6 +282,8 @@ class CodeEditor(tkinter.Frame):
         self.text.bind("<FocusIn>", self.enter)
         self.text.bind("<Control-d>", self.comment_line)
         self.text.bind("<Control-D>", self.decomment_line)
+        self.text.bind("<Tab>", self.indent)
+        self.text.bind("<ISO_Left_Tab>", self.deindent)
         self.text.set_insert_moved_callback(self.insert_moved)
 
         self.tags = collections.defaultdict(list)
@@ -321,7 +323,7 @@ class CodeEditor(tkinter.Frame):
 
     def close(self, *discard):
         if self.text.edit_modified():
-            save = messagebox.askyesnocancel("File {} has unsaved changes. Save?".format(self.fname))
+            save = messagebox.askyesnocancel(title="Close file", message="File {} has unsaved changes. Save?".format(self.fname))
             if save is None:
                 return False
             elif save is True:
@@ -376,8 +378,7 @@ class CodeEditor(tkinter.Frame):
                 end = "{}.{}".format(token.position.lineno + 1,
                                      token.position.end_index)
                 self.text.tag_add(token.style, start, end)
-                if isinstance(token, assembler.InteractiveToken):
-                    self.text.tag_add(self.create_tag(token), start, end)
+                self.text.tag_add(self.create_tag(token), start, end)
                 p = self.create_problem_tag(token)
                 if p:
                     self.text.tag_add(p, start, end)
@@ -606,10 +607,46 @@ class CodeEditor(tkinter.Frame):
                 break
         return "break"
 
+    def indent(self, *discard):
+        lineno, charno = map(int, self.text.index("insert").split("."))
+        line = self.text.get("{}.0".format(lineno), "{}.end".format(lineno))
+        while charno != len(line) and line[charno] == " ":
+            charno += 1
+        self.text.mark_set("insert", "{}.{}".format(lineno, charno))
+        if charno < 8:
+            spaces = 8 - charno
+        elif charno < 12:
+            spaces = 12 - charno
+        elif charno < 20:
+            spaces = 20 - charno
+        else:
+            spaces = 4
+        print("Indent by", spaces, "to", charno + spaces)
+        self.text.insert("insert", " " * spaces)
+        return "break"
+
+    def deindent(self, *discard):
+        lineno = int(self.text.index("insert").split(".")[0])
+        line = self.text.get("{}.0".format(lineno), "{}.end".format(lineno))
+        charno = 0
+        while charno != len(line) and line[charno] == " ":
+            charno += 1
+        self.text.mark_set("insert", "{}.{}".format(lineno, charno))
+        if charno > 20:
+            spaces = charno % 4 or 4
+        elif charno > 12:
+            spaces = charno - 12
+        elif charno > 8:
+            spaces = charno - 8
+        else:
+            spaces = charno
+        print("Deindent from", charno, "by", spaces, "to", charno - spaces)
+        self.text.delete("insert-{}c".format(spaces), "insert")
+        return "break"
+
 if __name__ == "__main__":
     import sys, tkinter.ttk as ttk
     root = tkinter.Tk(className='ToolTip-demo')
-    #ce.open(sys.argv[1])
     t = ttk.Notebook(root)
     t.grid(sticky=tkinter.NE + tkinter.SW)
     ce = CodeEditor(t)

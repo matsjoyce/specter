@@ -17,11 +17,11 @@ MNEMONIC_INFO = {
             " to address `xx`"),
     "LDA": ("5xx", "Load              ", "Load the value at address `xx` to "
             "the accumulator"),
-    "BRA": ("6xx", "Branch            ", "Unconditionally change the mnemuc"
+    "BRA": ("6xx", "Branch            ", "Unconditionally change the instruc"
             "tion counter to `xx`"),
-    "BRZ": ("7xx", "Branch if zero    ", "Change the mnemuction counter to "
+    "BRZ": ("7xx", "Branch if zero    ", "Change the instruction counter to "
             "`xx` if the accumulator is `0`"),
-    "BRP": ("8xx", "Branch if positive", "Change the mnemuction counter to "
+    "BRP": ("8xx", "Branch if positive", "Change the instruction counter to "
             "`xx` if the accumulator is `0` or greater [1]"),
     "INP": ("901", "Input             ", "Sets the accumulator to the value "
             "given by the user"),
@@ -387,12 +387,12 @@ class Assembler:
                     if i.mnemonic != "DAT":
                         instr.problems.append(problems.RuntimeWarning("{} will not {} a DAT instruction".format(instr.mnemonic, "store to" if instr.mnemonic == "STA" else "load from"), instr.position))
 
-        self.in_error = any(token.in_error for line in self.tokens)
+        self.in_error = any(token.in_error for token in self.tokens)
         self.parsed = True
         return self.parsed_code
 
     def problems(self):
-        return sum((token.problems for line in self.tokens), [])
+        return sum((token.problems for token in self.tokens), [])
 
     def assemble(self):
         if self.assembled:

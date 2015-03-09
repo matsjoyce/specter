@@ -54,7 +54,7 @@ class AssembleDialog(simpledialog.Dialog):
         if not self.assembler.in_error:
             b = tkinter.Button(box, text="Run", command=self.ok)
             b.pack(side=tkinter.LEFT)
-        b = tkinter.Button(box, text="Exit", command=self.cancel_)
+        b = tkinter.Button(box, text="Back to code", command=self.cancel_)
         b.pack(side=tkinter.LEFT)
 
         self.bind("<Return>", self.ok if not self.assembler.in_error else self.cancel_)
@@ -71,14 +71,17 @@ class CodeMode(tkinter.Frame):
         self.file_menu = tkinter.Menu(self.master.menu, tearoff=False)
         self.file_menu.add_command(label="New", command=self.new)
         self.file_menu.add_command(label="Open", command=self.open)
-        self.file_menu.add_command(label="Reload", command=self.reload_current)
+        self.file_menu.add_separator()
         self.file_menu.add_command(label="Save", command=self.save_current)
         self.file_menu.add_command(label="Save As", command=self.saveas_current)
+        self.file_menu.add_command(label="Reload", command=self.reload_current)
+        self.file_menu.add_separator()
         self.file_menu.add_command(label="Close", command=self.close_current)
         self.menus.append(dict(label="File", menu=self.file_menu))
 
         self.code_menu = tkinter.Menu(self.master.menu, tearoff=False)
         self.code_menu.add_command(label="Assemble", command=self.assemble)
+        self.code_menu.add_separator()
         self.code_menu.add_command(label="Comment", command=self.commant_current)
         self.code_menu.add_command(label="Decomment", command=self.commant_decurrent)
         self.menus.append(dict(label="Code", menu=self.code_menu))

@@ -139,7 +139,7 @@ class RunMode(tkinter.Frame):
                             padx=2, pady=2)
 
         switch_cmd = getattr(self.master, "codemode", lambda: None)
-        self.exit_btn = tkinter.Button(self.button_frame, text="Back to Code",
+        self.exit_btn = tkinter.Button(self.button_frame, text="Back to code",
                                        command=switch_cmd)
         self.exit_btn.grid(row=0, column=4, sticky=tkinter.E + tkinter.W,
                            padx=2, pady=2)
