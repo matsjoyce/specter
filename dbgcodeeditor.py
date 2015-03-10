@@ -47,18 +47,23 @@ class DebugCodeEditor(codeeditor.CodeEditor):
         super().__init__(master)
         for state, color in COLOR_MAP.items():
             self.text.tag_configure("state_" + state.value, background=color)
+        self.text.tag_raise("sel")
+        self.text["state"] = "disabled"
 
     def update_runner(self, runner):
         self.runner = runner
         self.assembler = self.runner.assembler
+        self.text["state"] = "normal"
         self.text.delete("1.0", tkinter.END)
         self.text.insert(tkinter.END, self.assembler.raw_code[:-1])
         self.text.edit_reset()
         self.text.edit_modified(False)
+        self.text["state"] = "disabled"
         self.set_name()
         self.update_syntax()
 
     def update_syntax(self):
+        self.text["state"] = "normal"
         super().update_syntax()
         for state in runner.ValueState:
             self.text.tag_remove("state_" + state.value, "1.0", tkinter.END)
@@ -70,6 +75,7 @@ class DebugCodeEditor(codeeditor.CodeEditor):
             self.text.tag_add("state_" + val.state.value,
                               str(lineno) + ".0",
                               str(lineno + 1) + ".0")
+        self.text["state"] = "disabled"
 
     def make_tooltip(self, token):
         if self.tooltip:
@@ -88,6 +94,7 @@ class DebugCodeEditor(codeeditor.CodeEditor):
 
     def set_name(self):
         pass
+
 
 if __name__ == "__main__":
     import sys, tkinter.ttk as ttk
