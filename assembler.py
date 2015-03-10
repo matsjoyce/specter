@@ -357,6 +357,8 @@ class Assembler:
 
         for bra in filter(lambda tok: tok.mnemonic == "BRA", self.instructions):
             if bra.arg and isinstance(bra.arg, (LabelRef, Number)) and bra.arg.resolve() is not None:
+                if bra.address < bra.arg.resolve():
+                    continue
                 for mnem in self.instructions[bra.arg.resolve():bra.address]:
                     if mnem.mnemonic in ("BRP", "BRZ", "BRA"):
                         break
