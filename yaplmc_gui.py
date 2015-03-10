@@ -67,7 +67,7 @@ class GUIManager(tkinter.Tk):
         self.update_menu(self.run_mode.menus)
 
         ce = self.code_mode.current_codeeditor()
-        self.run_mode.set_code(ce.assembler.assemble(), ce.fname)
+        self.run_mode.set_code(ce.assembler, ce.fname)
         self.run_mode.reset()
 
     def codemode(self, *discard):

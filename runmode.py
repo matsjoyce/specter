@@ -3,23 +3,9 @@ from tkinter import (filedialog as fdialog, scrolledtext as stext,
                      simpledialog, font as tkfont)
 import math
 import functools
-import yaplmc
+import runner
+import dbgcodeeditor
 
-
-CHANGEDN = "#C00"
-CHANGED = "#E00"
-
-READN = "#CC0"
-READ = "#EE0"
-
-INTRN = "#080"
-INTR = "#0A0"
-
-NINTRN = "#AAA"
-NINTR = "#CCC"
-
-DEFAULTN = "#DDD"
-DEFAULT = "#FFF"
 
 STICKY_NESW = tkinter.NE + tkinter.SW
 
@@ -51,7 +37,7 @@ class MemoryDisplay(tkinter.Frame):
             col = int(math.floor(i / self.per_thing))
             row = i % self.per_thing + 1
 
-            mn = tkinter.Entry(self, width=2, bg=DEFAULT, borderwidth=0)
+            mn = tkinter.Entry(self, width=2, bg="white", borderwidth=0)
             mn.grid(row=row, column=col * 2, sticky=STICKY_NESW)
             mn.insert(0, str(i).zfill(2))
             self.memory_nums.append(mn)
@@ -60,7 +46,7 @@ class MemoryDisplay(tkinter.Frame):
             var = tkinter.StringVar(value="000")
             vcmd = (self.register(functools.partial(self.changed, i)), "%P",
                     "%V")
-            m = tkinter.Entry(self, width=3, bg=DEFAULT, borderwidth=0,
+            m = tkinter.Entry(self, width=3, bg="white", borderwidth=0,
                               textvariable=var, vcmd=vcmd, validate="all")
             m.grid(row=row, column=col * 2 + 1, sticky=STICKY_NESW)
             self.memorys.append(m)
@@ -81,24 +67,14 @@ class MemoryDisplay(tkinter.Frame):
             self.after(0, self.updater)
         return True
 
-    def update_memory(self, mem):
-        for i, m in enumerate(mem):
-            self.mem_vars[i].set(str(m).zfill(3))
+    def update_memory(self, runner):
+        for i, m in enumerate(runner.memory):
+            self.mem_vars[i].set(str(m.value).zfill(3))
 
-    def set_colors(self, mem_changed, mem_read, instr, ninstr):
-        for i in range(100):
-            self.memory_nums[i]["readonlybackground"] = DEFAULTN
-            self.memorys[i]["bg"] = DEFAULT
-        for i in mem_read:
-            self.memory_nums[i]["readonlybackground"] = READN
-            self.memorys[i]["bg"] = READ
-        for i in mem_changed:
-            self.memory_nums[i]["readonlybackground"] = CHANGEDN
-            self.memorys[i]["bg"] = CHANGED
-        self.memory_nums[instr]["readonlybackground"] = INTRN
-        self.memorys[instr]["bg"] = INTR
-        self.memory_nums[ninstr]["readonlybackground"] = NINTRN
-        self.memorys[ninstr]["bg"] = NINTR
+    def set_colors(self, runner):
+        for i, m in enumerate(runner.memory):
+            self.memory_nums[i]["readonlybackground"] = dbgcodeeditor.COLOR_MAP[m.state]
+            self.memorys[i]["bg"] = dbgcodeeditor.darken(dbgcodeeditor.COLOR_MAP[m.state])
 
 
 class RunMode(tkinter.Frame):
@@ -109,6 +85,7 @@ class RunMode(tkinter.Frame):
         self.run_to_halt = False
         self.show_debug = 0
         self.all_output = []
+        self.runner = runner.Runner(self.give_output)
 
         # Top row of buttons
 
@@ -162,7 +139,7 @@ class RunMode(tkinter.Frame):
         self.accumulator_var = tkinter.StringVar(value="000")
         vcmd = self.register(self.accumulator_changed), "%P", "%V"
         self.accumulator = mn = tkinter.Entry(self.control_frame, width=5,
-                                              bg=DEFAULT, borderwidth=0,
+                                              bg="white", borderwidth=0,
                                               textvar=self.accumulator_var,
                                               vcmd=vcmd, validate="all")
         self.accumulator.grid(row=0, column=1, sticky=tkinter.W,
@@ -174,7 +151,7 @@ class RunMode(tkinter.Frame):
         self.counter_var = tkinter.StringVar(value="000")
         vcmd = self.register(self.counter_changed), "%P", "%V"
         self.counter = tkinter.Entry(self.control_frame, width=5,
-                                     bg=DEFAULT, borderwidth=0,
+                                     bg="white", borderwidth=0,
                                      textvar=self.counter_var,
                                      vcmd=vcmd, validate="all")
         self.counter.grid(row=1, column=1, sticky=tkinter.W, padx=10, pady=5)
@@ -222,13 +199,13 @@ class RunMode(tkinter.Frame):
         self.output.tag_configure("done", font=normal_font)
 
         self.output.tag_configure("debug_write", font=italic_font,
-                                  foreground=CHANGEDN)
+                                  foreground=dbgcodeeditor.darken(dbgcodeeditor.WRITTEN_COLOR))
         self.output.tag_configure("debug_read", font=italic_font,
-                                  foreground=READN)
+                                  foreground=dbgcodeeditor.darken(dbgcodeeditor.READ_COLOR))
         self.output.tag_configure("debug_jump", font=italic_font,
-                                  foreground=NINTRN)
+                                  foreground=dbgcodeeditor.darken(dbgcodeeditor.NEXT_EXEC_COLOR))
         self.output.tag_configure("debug_other", font=italic_font,
-                                  foreground=INTRN)
+                                  foreground=dbgcodeeditor.darken(dbgcodeeditor.EXECUTED_COLOR))
 
         self.output.tag_configure("debug_output", font=bold_font)
         self.output.tag_configure("debug_input", font=bold_font)
@@ -284,10 +261,8 @@ class RunMode(tkinter.Frame):
         self.run_menu.add_command(label="Reset", command=self.reset)
         self.menus.append(dict(label="Run", menu=self.run_menu))
 
-    def set_code(self, code, fname):
-        self.runner = yaplmc.Runner(code, give_output=self.give_output,
-                                    halt_for_inp=True,
-                                    unfiltered_debug_output=self.give_debug)
+    def set_code(self, assembler, fname):
+        self.runner.load_code(assembler)
         self.update_memory()
 
     def accumulator_changed(self, num, reason):
@@ -295,7 +270,7 @@ class RunMode(tkinter.Frame):
             ok, num = check_num(num)
             if not hasattr(self, "runner") or not ok:
                 return False
-            self.runner.setaccum(num)
+            self.runner.accumulator.write(num)
             self.set_colors()
         elif reason == "focusout":
             self.after(0, self.update_memory)
@@ -328,12 +303,12 @@ class RunMode(tkinter.Frame):
             self.give_output(e.args[0], type="error")
             self.run_to_halt = False
             ret = None
-        self.type_debug()
+        self.give_debug()
         self.update_memory()
         self.update_output()
-        if ret == yaplmc.HALT_REASON_HLT:
+        if ret is runner.HaltReason.hlt:
             self.run_to_halt = False
-        elif ret == yaplmc.HALT_REASON_INP:
+        elif ret == runner.HaltReason.input:
             self.get_input()
         return ret
 
@@ -350,20 +325,12 @@ class RunMode(tkinter.Frame):
         self.run_to_halt = False
 
     def set_colors(self):
-        if self.runner.accumulator_changed:
-            self.accumulator.config(bg=CHANGED)
-        elif self.runner.accumulator_read:
-            self.accumulator.config(bg=READ)
-        else:
-            self.accumulator.config(bg=DEFAULT)
-        self.memory_frame.set_colors(self.runner.memory_changed,
-                                     self.runner.memory_read,
-                                     self.runner.instruction_addr,
-                                     self.runner.counter)
+        self.accumulator.config(bg=dbgcodeeditor.COLOR_MAP[self.runner.accumulator.state])
+        self.memory_frame.set_colors(self.runner)
 
     def update_memory(self):
-        self.memory_frame.update_memory(self.runner.memory)
-        self.accumulator_var.set(str(self.runner.accumulator).zfill(3))
+        self.memory_frame.update_memory(self.runner)
+        self.accumulator_var.set(str(self.runner.accumulator.value).zfill(3))
         self.counter_var.set(str(self.runner.counter).zfill(3))
         self.set_colors()
 
@@ -386,22 +353,16 @@ class RunMode(tkinter.Frame):
             self.all_output.append((i, type))
         self.update_output()
 
-    def give_debug(self, t, level):
-        if level == 1:
-            self.give_output(t, type="waiting_typing")
-
-    def type_debug(self):
-        if self.runner.memory_changed:
+    def give_debug(self):
+        if any(m.state == runner.ValueState.written for m in self.runner.memory):
             t = "_write"
-        elif self.runner.memory_read:
+        elif any(m.state == runner.ValueState.read for m in self.runner.memory):
             t = "_read"
         elif self.runner.instruction_addr != self.runner.counter - 1:
             t = "_jump"
         else:
             t = "_other"
-        for i, (text, type) in enumerate(self.all_output):
-            if type == "waiting_typing":
-                self.all_output[i] = (text, "debug" + t)
+        self.all_output.append((self.runner.hint, "debug" + t))
 
     def update_output(self):
         self.output["state"] = "normal"
@@ -463,7 +424,7 @@ class RunMode(tkinter.Frame):
     def setmem(self, addr, value):
         if self.run_to_halt or self.getting_inp:
             return False
-        self.runner.setmem(addr, value)
+        self.runner.memory[addr].write(value)
         self.set_colors()
         return True
 

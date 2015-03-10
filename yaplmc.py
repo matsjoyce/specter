@@ -240,7 +240,7 @@ under certain conditions. Type `yaplmc --licence` for details.
     assembler_.update_code(code)
     assembler_.assemble()
     for problem in assembler_.problems():
-        print(problem.show(code))
+        print(problem.show(code.split("\n")))
         print()
     if assembler_.in_error:
         print("Assembly failed")

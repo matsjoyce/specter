@@ -82,7 +82,7 @@ class TooltipContentInterface:
 
 
 class Tooltip(tkinter.Toplevel):
-    def __init__(self, master, interactives, position):
+    def __init__(self, master, interactives, position, content_interface=TooltipContentInterface):
         super().__init__(master, padx=1, pady=1, bg="black")
         self.overrideredirect(1)
         self.transient(master)
@@ -94,27 +94,9 @@ class Tooltip(tkinter.Toplevel):
             frame.pack(padx=1, pady=1)
             text_widget = tkinter.Text(frame, bg="white", width=50, height=4, border=0)
 
-            normal_font = text_widget.cget("font")
+            self.setup_text(text_widget)
 
-            bold_font = tkfont.Font(text_widget, normal_font)
-            bold_font["weight"] = "bold"
-
-            underline_font = tkfont.Font(text_widget, normal_font)
-            underline_font["underline"] = "1"
-
-            text_widget.tag_configure("type", foreground=LABEL_COLOR)
-            text_widget.tag_configure("value", font=bold_font)
-            text_widget.tag_configure("number", foreground=NUMBER_COLOR)
-            text_widget.tag_configure("link", font=underline_font, foreground="blue")
-            text_widget.tag_configure("error_h", font=bold_font, foreground=ERROR_COLOR)
-            text_widget.tag_configure("error_d", foreground=ERROR_COLOR)
-            text_widget.tag_configure("warning_h", font=bold_font, foreground=WARNING_COLOR)
-            text_widget.tag_configure("warning_d", foreground=WARNING_COLOR)
-            self.orig_cursor = text_widget["cursor"]
-            text_widget.tag_bind("link", "<Enter>", functools.partial(self.link_enter, text_widget))
-            text_widget.tag_bind("link", "<Leave>", functools.partial(self.link_leave, text_widget))
-
-            interactive.set_interactive(TooltipContentInterface(self, text_widget))
+            interactive.set_interactive(content_interface(self, text_widget))
             lines = text_widget.get("1.0", tkinter.END).rstrip("\n").split("\n")
             text_widget["height"] = len(lines)
             widths.append(max(map(len, lines)))
@@ -133,6 +115,27 @@ class Tooltip(tkinter.Toplevel):
         self.bind("<Leave>", self.leave)
         self.entered = False
         self.dying = False
+
+    def setup_text(self, text_widget):
+        normal_font = text_widget.cget("font")
+
+        bold_font = tkfont.Font(text_widget, normal_font)
+        bold_font["weight"] = "bold"
+
+        underline_font = tkfont.Font(text_widget, normal_font)
+        underline_font["underline"] = "1"
+
+        text_widget.tag_configure("type", foreground=LABEL_COLOR)
+        text_widget.tag_configure("value", font=bold_font)
+        text_widget.tag_configure("number", foreground=NUMBER_COLOR)
+        text_widget.tag_configure("link", font=underline_font, foreground="blue")
+        text_widget.tag_configure("error_h", font=bold_font, foreground=ERROR_COLOR)
+        text_widget.tag_configure("error_d", foreground=ERROR_COLOR)
+        text_widget.tag_configure("warning_h", font=bold_font, foreground=WARNING_COLOR)
+        text_widget.tag_configure("warning_d", foreground=WARNING_COLOR)
+        self.orig_cursor = text_widget["cursor"]
+        text_widget.tag_bind("link", "<Enter>", functools.partial(self.link_enter, text_widget))
+        text_widget.tag_bind("link", "<Leave>", functools.partial(self.link_leave, text_widget))
 
     def link_enter(self, text_widget, event):
         text_widget["cursor"] = ""
@@ -172,14 +175,14 @@ class CustomText(tkinter.Text):
 
         # Danger Will Robinson!
         # Heavy voodoo here. All widget changes happen via
-        # an internal Tcl command with the same name as the 
+        # an internal Tcl command with the same name as the
         # widget:  all inserts, deletes, cursor changes, etc
         #
         # The beauty of Tcl is that we can replace that command
         # with our own command. The following code does just
         # that: replace the code with a proxy that calls the
         # original command and then calls a callback. We
-        # can then do whatever we want in the callback. 
+        # can then do whatever we want in the callback.
         private_callback = self.register(self._callback)
         self.tk.eval("""
             proc widget_proxy {actual_widget callback args} {
@@ -192,8 +195,8 @@ class CustomText(tkinter.Text):
                 set result [uplevel [linsert $args 0 $actual_widget]]
 
                 # call the callback and ignore errors, but only
-                # do so on inserts, deletes, and changes in the 
-                # mark. Otherwise we'll call the callback way too 
+                # do so on inserts, deletes, and changes in the
+                # mark. Otherwise we'll call the callback way too
                 # often.
                 if {! [info exists $flag]} {
                     if {([lindex $args 0] in {insert replace delete}) ||

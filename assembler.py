@@ -364,7 +364,6 @@ class Assembler:
                     bra.problems.append(problems.RuntimeWarning("Possible infinite loop", bra.position, extra=("Starting at", self.instructions[bra.arg.resolve()])))
 
         for instr in filter(lambda tok: tok.mnemonic != "DAT", self.instructions):
-            print(instr, instr.arg)
             if instr.arg and isinstance(instr.arg, Number):
                 if instr.arg.capped_value >= len(self.instructions):
                     instr.problems.append(problems.RuntimeWarning("Argument does not point at a initialised position", instr.position))
@@ -398,12 +397,9 @@ class Assembler:
         if self.assembled:
             return self.machine_code
         self.parse()
-        self.machine_code = []
-        if not self.in_error:
-            for line in self.parsed_code:
-                for token in line:
-                    if isinstance(token, Mnemonic):
-                        self.machine_code.append(token.machine_instruction())
+        if self.in_error:
+            return
+        self.machine_code = [i.machine_instruction() for i in self.instructions]
         self.machine_code_length = len(self.machine_code)
         while len(self.machine_code) < 100:
             self.machine_code.append(0)
@@ -415,7 +411,6 @@ class Assembler:
         if col is None and isinstance(row, Position):
             line = self.parsed_code[row.lineno]
             for token in line:
-                print(token.position, row, token.position == row)
                 if token.position == row:
                     return token
         else:
