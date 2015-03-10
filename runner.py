@@ -41,6 +41,7 @@ class MemoryValue:
 
     def reset(self):
         self.value = self.token.machine_instruction() if self.token else 0
+        self.state = ValueState.normal
 
     def reset_state(self):
         self.state = ValueState.normal

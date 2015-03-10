@@ -1,6 +1,6 @@
 import tkinter
 from tkinter import (filedialog as fdialog, scrolledtext as stext,
-                     simpledialog, font as tkfont)
+                     simpledialog, font as tkfont, ttk)
 import math
 import functools
 import runner
@@ -24,8 +24,6 @@ def check_num(num):
 class MemoryDisplay(tkinter.Frame):
     def __init__(self, root, setmem, updater, rows=5):
         super().__init__(root)
-        tkinter.Label(self, text="Memory").grid(row=0, column=1,
-                                                columnspan=rows * 2)
         self.setmem = setmem
         self.rows = rows
         self.per_thing = 100 // rows
@@ -35,9 +33,9 @@ class MemoryDisplay(tkinter.Frame):
         self.updater = updater
         for i in range(100):
             col = int(math.floor(i / self.per_thing))
-            row = i % self.per_thing + 1
+            row = i % self.per_thing
 
-            mn = tkinter.Entry(self, width=2, bg="white", borderwidth=0)
+            mn = tkinter.Entry(self, width=2, bg="white", borderwidth=0, selectbackground="white", selectforeground="black")
             mn.grid(row=row, column=col * 2, sticky=STICKY_NESW)
             mn.insert(0, str(i).zfill(2))
             self.memory_nums.append(mn)
@@ -73,8 +71,8 @@ class MemoryDisplay(tkinter.Frame):
 
     def set_colors(self, runner):
         for i, m in enumerate(runner.memory):
-            self.memory_nums[i]["readonlybackground"] = dbgcodeeditor.COLOR_MAP[m.state]
-            self.memorys[i]["bg"] = dbgcodeeditor.darken(dbgcodeeditor.COLOR_MAP[m.state])
+            self.memory_nums[i]["readonlybackground"] = dbgcodeeditor.darken(dbgcodeeditor.COLOR_MAP[m.state])
+            self.memorys[i]["bg"] = dbgcodeeditor.COLOR_MAP[m.state]
 
 
 class RunMode(tkinter.Frame):
@@ -239,17 +237,27 @@ class RunMode(tkinter.Frame):
         self.control_frame.columnconfigure(1, weight=1)
         self.control_frame.rowconfigure(3, weight=1)
 
-        # Memory display on right
+        # Tabber for switching between memory and code
 
-        self.memory_frame = MemoryDisplay(self, self.setmem,
+        self.tabber = ttk.Notebook(self)
+        self.tabber.grid(row=1, column=1, sticky=STICKY_NESW, padx=5, pady=5)
+        self.tabber.bind("<<NotebookTabChanged>>", self.unfocus_tabber_widget)
+
+        # Memory display in the tabber
+
+        self.memory_frame = MemoryDisplay(self.tabber, self.setmem,
                                           self.update_memory)
-        self.memory_frame.grid(row=1, column=1, sticky=STICKY_NESW,
-                               padx=5, pady=5)
+        self.tabber.add(self.memory_frame, text="Memory", sticky=STICKY_NESW)
+
+        # Code display in the tabber
+
+        self.code_editor = dbgcodeeditor.DebugCodeEditor(self.tabber)
+        self.tabber.add(self.code_editor, text="Code", sticky=STICKY_NESW)
 
         # Make resizeable
 
-        self.columnconfigure(1, weight=2)
-        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=3)
+        self.columnconfigure(0, weight=2)
         self.rowconfigure(1, weight=1)
 
         self.after(1, self.run_halt_check)  # Kick off
@@ -261,9 +269,14 @@ class RunMode(tkinter.Frame):
         self.run_menu.add_command(label="Reset", command=self.reset)
         self.menus.append(dict(label="Run", menu=self.run_menu))
 
+    def unfocus_tabber_widget(self, *e):
+        self.memory_frame.memory_nums[0].selection_clear()
+
     def set_code(self, assembler, fname):
         self.runner.load_code(assembler)
+        self.code_editor.update_runner(self.runner)
         self.update_memory()
+        self.code_editor.update_syntax()
 
     def accumulator_changed(self, num, reason):
         if reason == "key":
@@ -327,6 +340,7 @@ class RunMode(tkinter.Frame):
     def set_colors(self):
         self.accumulator.config(bg=dbgcodeeditor.COLOR_MAP[self.runner.accumulator.state])
         self.memory_frame.set_colors(self.runner)
+        self.code_editor.update_syntax()
 
     def update_memory(self):
         self.memory_frame.update_memory(self.runner)
@@ -433,7 +447,7 @@ class RunMode(tkinter.Frame):
         self.getting_inp = False
         self.all_output = []
         self.runner.reset()
-        self.update_memory()
+        self.set_colors()
         self.update_output()
 
     def do_bindings(self):

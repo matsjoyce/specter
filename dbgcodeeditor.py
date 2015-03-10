@@ -12,7 +12,7 @@ EXECUTED_COLOR = "#0A0"
 NEXT_EXEC_COLOR = "#CCC"
 
 
-COLOR_MAP = dict(zip(runner.ValueState, ["white", READ_COLOR, WRITTEN_COLOR,
+COLOR_MAP = dict(zip(runner.ValueState, ["#FFF", READ_COLOR, WRITTEN_COLOR,
                                          EXECUTED_COLOR, NEXT_EXEC_COLOR]))
 
 
@@ -52,7 +52,7 @@ class DebugCodeEditor(codeeditor.CodeEditor):
         self.runner = runner
         self.assembler = self.runner.assembler
         self.text.delete("1.0", tkinter.END)
-        self.text.insert(tkinter.END, self.assembler.raw_code)
+        self.text.insert(tkinter.END, self.assembler.raw_code[:-1])
         self.text.edit_reset()
         self.text.edit_modified(False)
         self.set_name()
@@ -84,6 +84,9 @@ class DebugCodeEditor(codeeditor.CodeEditor):
 
     def create_problem_tag(self, token):
         # Disable problem underlining
+        pass
+
+    def set_name(self):
         pass
 
 if __name__ == "__main__":
