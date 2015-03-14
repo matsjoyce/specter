@@ -64,7 +64,6 @@ class MemoryValue:
         self.state = ValueState.next_exec
 
     def hit_breakpoint(self):
-        print(self.breakpoint, self.state)
         if self.breakpoint == BreakpointState.off:
             return False
         elif self.breakpoint == BreakpointState.on_execute:
@@ -105,6 +104,8 @@ class Runner:
         self.assembler = assembler
         self.memory = []
         self.assembler.assemble()
+        if self.assembler.in_error:
+            return
         for i, v in enumerate(self.assembler.instructions):
             self.memory.append(MemoryValue(i, v))
         while len(self.memory) < 100:
