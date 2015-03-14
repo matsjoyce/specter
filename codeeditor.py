@@ -28,7 +28,9 @@ BREAKPOINT_SHORTENED = {
     runner.BreakpointState.off: "",
     runner.BreakpointState.on_execute: "E",
     runner.BreakpointState.on_read: "R",
-    runner.BreakpointState.on_write: "W"
+    runner.BreakpointState.on_write: "W",
+    runner.BreakpointState.on_rw: "RW",
+    runner.BreakpointState.on_next_execute: "NE"
 }
 
 
@@ -329,6 +331,9 @@ class CodeEditor(tkinter.Frame):
         self.text.tag_configure("number", foreground=NUMBER_COLOR,
                                 background="white")
         self.text.tag_configure("breakpoint", background=BREAKPOINT_BG_COLOR)
+
+        self.breakbar.tag_configure("breakpoint", foreground="red", font=bold_font)
+
         self.text.tag_raise("sel")  # Otherwise selecting a label, mnemonic, etc. will results in a white background
 
         self.text.bind("<Motion>", self.motion)
@@ -525,8 +530,11 @@ class CodeEditor(tkinter.Frame):
             else:
                 print(old, "==X")
         if self.breakpoints != new_breakpoints:
+            print("Breakpoints changed")
             self.breakpoints = new_breakpoints
             self.breakpoints_changed()
+        else:
+            print("Breakpoints not changed", sorted(self.breakpoints.items())==sorted(new_breakpoints.items()))
 
         for m in self.sidebar_markers:
             self.text.mark_unset(m)
@@ -566,8 +574,11 @@ class CodeEditor(tkinter.Frame):
         self.breakbar.delete("1.0", "end")
         breakinfo = []
         for lineno in range(current_lines):
-            breakinfo.append(BREAKPOINT_SHORTENED[self.breakpoints[lineno]])
-        self.breakbar.insert("end", "\n".join(breakinfo))
+            short = BREAKPOINT_SHORTENED[self.breakpoints[lineno]]
+            if short:
+                self.breakbar.insert("end", short, "breakpoint")
+            if lineno != current_lines - 1:
+                self.breakbar.insert("end", "\n")
 
         self.text.tag_remove("breakpoint", "1.0", "end")
         for lineno, type in self.breakpoints.items():
@@ -587,6 +598,7 @@ class CodeEditor(tkinter.Frame):
     def do_change_breakpoint(self):
         value = self.change_breakpoint_var.get()
         self.breakpoints[self.changing_breakpoint_lineno] = runner.BreakpointState(value)
+        self.breakpoints_changed()
         self.update_sidebars()
 
     def start_syntax_update_timer(self):

@@ -6,6 +6,8 @@ class BreakpointState(enum.Enum):
     on_execute = "execute"
     on_read = "read"
     on_write = "write"
+    on_rw = "read or write"
+    on_next_execute = "next to execute"
 
 
 class ValueState(enum.Enum):
@@ -62,6 +64,7 @@ class MemoryValue:
         self.state = ValueState.next_exec
 
     def hit_breakpoint(self):
+        print(self.breakpoint, self.state)
         if self.breakpoint == BreakpointState.off:
             return False
         elif self.breakpoint == BreakpointState.on_execute:
@@ -70,6 +73,10 @@ class MemoryValue:
             return self.state == ValueState.read
         elif self.breakpoint == BreakpointState.on_write:
             return self.state == ValueState.written
+        elif self.breakpoint == BreakpointState.on_rw:
+            return self.state in (ValueState.read, ValueState.written)
+        elif self.breakpoint == BreakpointState.on_next_execute:
+            return self.state == ValueState.next_exec
 
     def set_interactive(self, tooltip):
         if self.token:
@@ -110,6 +117,7 @@ class Runner:
         brps = sorted(brps.items())
         for instr in self.assembler.instructions:
             value = self.memory[instr.address]
+            value.breakpoint = BreakpointState.off
             while brps and brps[0][0] <= instr.position.lineno:
                 value.breakpoint = brps.pop(0)[1]
         print("BREAKPOINTS")
