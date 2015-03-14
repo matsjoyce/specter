@@ -68,6 +68,7 @@ class GUIManager(tkinter.Tk):
 
         ce = self.code_mode.current_codeeditor()
         self.run_mode.set_code(ce.assembler, ce.fname)
+        self.run_mode.set_breakpoints(self.code_mode.current_codeeditor().breakpoints)
         self.run_mode.reset()
 
     def codemode(self, *discard):
@@ -77,6 +78,9 @@ class GUIManager(tkinter.Tk):
         self.code_mode.grid(row=0, column=0, sticky=tkinter.NE + tkinter.SW)
         self.code_mode.do_bindings()
         self.code_mode.focus_set()
+        ce = self.code_mode.current_codeeditor()
+        ce.breakpoints = self.run_mode.code_editor.breakpoints
+        ce.update_sidebars()
         self.update_menu(self.code_mode.menus)
 
 

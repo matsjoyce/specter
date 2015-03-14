@@ -106,6 +106,16 @@ class Runner:
         self.breakables = self.memory + [self.accumulator]
         self.reset()
 
+    def load_breakpoints(self, brps):
+        brps = sorted(brps.items())
+        for instr in self.assembler.instructions:
+            value = self.memory[instr.address]
+            while brps and brps[0][0] <= instr.position.lineno:
+                value.breakpoint = brps.pop(0)[1]
+        print("BREAKPOINTS")
+        for i, value in enumerate(self.memory):
+            print(str(i).zfill(3), value.breakpoint)
+
     def give_input(self, i):
         if self.halt_reason == HaltReason.input:
             self.accumulator.write(i)

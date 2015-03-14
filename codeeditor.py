@@ -3,9 +3,13 @@ from tkinter import scrolledtext as stext, font as tkfont, filedialog, ttk, mess
 import functools
 import collections
 import assembler
+import runner
 import itertools
 import re
 import os
+import enum
+import random
+import traceback
 
 
 # Colors from Kate theme
@@ -18,6 +22,21 @@ WARNING_COLOR = "#CA9219"
 
 HOVER_TIME = 500
 
+BREAKPOINT_BG_COLOR = "#FDD"
+
+BREAKPOINT_SHORTENED = {
+    runner.BreakpointState.off: "",
+    runner.BreakpointState.on_execute: "E",
+    runner.BreakpointState.on_read: "R",
+    runner.BreakpointState.on_write: "W"
+}
+
+
+class LineBarMode(enum.Enum):
+    none = "none"
+    address = "address"
+    lineno = "line number"
+
 
 # itertools recipes
 def grouper(iterable, n, fillvalue=None):
@@ -25,6 +44,16 @@ def grouper(iterable, n, fillvalue=None):
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
     args = [iter(iterable)] * n
     return itertools.zip_longest(*args, fillvalue=fillvalue)
+
+
+def catch_crash(f):
+    def cc_wrapper(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            open("errors.log", "a").write(traceback.format_exc())
+            traceback.print_exc()
+    return cc_wrapper
 
 
 class TooltipContentInterface:
@@ -235,22 +264,45 @@ class CodeEditor(tkinter.Frame):
 
         self.hovered_token_mode = "cursor"
 
+        # dict of address to breakpoint type
+        self.breakpoints = collections.defaultdict(lambda: runner.BreakpointState.off)
+        self.linebar_type = LineBarMode.address
+        self.sidebar_markers = set()
+
         self.fname = None
 
         self.text = CustomText(self, bg="white", wrap=tkinter.NONE, undo=True)
-        self.text.grid(column=0, row=0, sticky=tkinter.NE + tkinter.SW)
+        self.text.grid(column=1, row=0, sticky=tkinter.NE + tkinter.SW)
 
-        self.vbar = tkinter.Scrollbar(self, command=self.text.yview)
-        self.vbar.grid(column=1, row=0, sticky=tkinter.N + tkinter.S)
+        self.sideframe = tkinter.Frame(self)
+        self.sideframe.grid(column=0, row=0, sticky=tkinter.N + tkinter.S)
+        self.sideframe.rowconfigure(0, weight=1)
+        self.sideframe.columnconfigure(1, weight=1)
+
+        self.linebar = tkinter.Text(self.sideframe, bg="white", width=2, wrap=tkinter.NONE)
+        self.linebar.grid(column=0, row=0, sticky=tkinter.N + tkinter.S)
+        self.linebar["yscrollcommand"] = functools.partial(self.yscroll, self.linebar, yxmode=True)
+
+        self.breakbar = tkinter.Text(self.sideframe, bg="white", fg="red", width=2, wrap=tkinter.NONE)
+        self.breakbar.grid(column=1, row=0, sticky=tkinter.N + tkinter.S)
+        self.breakbar["yscrollcommand"] = functools.partial(self.yscroll, self.breakbar, yxmode=True)
+
+        self.breakbar["state"] = "disabled"
+        self.linebar["state"] = "disabled"
+
+        self.vbar = tkinter.Scrollbar(self)
+        self.vbar["command"] = functools.partial(self.yscroll, self.vbar)
+        self.vbar.grid(column=2, row=0, sticky=tkinter.N + tkinter.S)
+
         self.hbar = tkinter.Scrollbar(self, orient=tkinter.HORIZONTAL,
-                                      command=self.text.xview)
-        self.hbar.grid(column=0, row=1, sticky=tkinter.E + tkinter.W)
-        self.text["xscrollcommand"] = lambda *a: (self.nuke_tooltip(),
-                                                  self.hbar.set(*a))
-        self.text["yscrollcommand"] = lambda *a: (self.nuke_tooltip(),
-                                                  self.vbar.set(*a))
+                                      command=lambda *a: (self.nuke_tooltip(), self.text.xview(*a)))
+        self.hbar.grid(column=0, row=1, columnspan=2, sticky=tkinter.E + tkinter.W)
 
-        self.columnconfigure(0, weight=1)
+        self.text["xscrollcommand"] = lambda y, x: (self.nuke_tooltip(),
+                                                    self.hbar.set(y, x), print("MTT", x, y))
+        self.text["yscrollcommand"] = functools.partial(self.yscroll, self.text, yxmode=True)
+
+        self.columnconfigure(1, weight=1)
         self.rowconfigure(0, weight=1)
 
         self.assembler = assembler.Assembler()
@@ -276,6 +328,7 @@ class CodeEditor(tkinter.Frame):
                                 background="white")
         self.text.tag_configure("number", foreground=NUMBER_COLOR,
                                 background="white")
+        self.text.tag_configure("breakpoint", background=BREAKPOINT_BG_COLOR)
         self.text.tag_raise("sel")  # Otherwise selecting a label, mnemonic, etc. will results in a white background
 
         self.text.bind("<Motion>", self.motion)
@@ -293,6 +346,15 @@ class CodeEditor(tkinter.Frame):
         self.token_to_tag = {}
         self.token_to_problem_tag = {}
 
+        self.change_breakpoint_var = tkinter.StringVar()
+
+        self.change_breakpoint_menu = tkinter.Menu(self.breakbar, tearoff=0)
+        for option in runner.BreakpointState:
+            self.change_breakpoint_menu.add_radiobutton(label=option.value.title(), variable=self.change_breakpoint_var, value=option.value, command=self.do_change_breakpoint)
+
+        self.breakbar.bind("<Button-3>", self.change_breakpoint)
+        self.change_breakpoint_menu.bind("<Leave>", lambda *a:self.change_breakpoint_menu.unpost())
+
         self.set_name()
 
     # File-based stuff
@@ -308,6 +370,9 @@ class CodeEditor(tkinter.Frame):
         self.text.edit_modified(False)
         self.set_name()
         self.update_syntax()
+        self.update_sidebars()
+        self.text.yview_moveto(0.0)
+        self.text.xview_moveto(0.0)
 
     def save(self, *discard):
         print("save")
@@ -337,6 +402,37 @@ class CodeEditor(tkinter.Frame):
         if self.close():
             self.open(self.fname)
 
+    # Scrolling
+
+    @catch_crash
+    def yscroll(self, w, *a, yxmode=False):
+        print(w, a, yxmode)
+        self.nuke_tooltip()
+        if w not in (self.hbar, self.vbar) and yxmode:
+            print("self.bars")
+            self.hbar.set(*a)
+            self.vbar.set(*a)
+        if yxmode:
+            if w != self.text:
+                print("self.text", a[0])
+                self.text.yview_moveto(a[0])
+            if w != self.linebar:
+                print("self.linebar", a[0])
+                self.linebar.yview_moveto(a[0])
+            if w != self.breakbar:
+                print("self.breakbar", a[0])
+                self.breakbar.yview_moveto(a[0])
+        else:
+            if w != self.text:
+                print("self.text", a)
+                self.text.yview(*a)
+            if w != self.linebar:
+                print("self.linebar", a)
+                self.linebar.yview(*a)
+            if w != self.breakbar:
+                print("self.breakbar", a)
+                self.breakbar.yview(*a)
+
     # Syntax highlighting
 
     def create_tag(self, token):
@@ -358,6 +454,7 @@ class CodeEditor(tkinter.Frame):
             self.text.tag_raise(pname)
             return pname
 
+    @catch_crash
     def update_syntax(self):
         self.dehighlight()
         print("++++++++", self.text.tag_names())
@@ -370,22 +467,127 @@ class CodeEditor(tkinter.Frame):
         print("++++++++", self.text.tag_names())
         for tag in self.text.tag_names():
             self.text.tag_remove(tag, "1.0", tkinter.END)
-        self.assembler.update_code(self.text.get("1.0", "end"))
-        self.assembler.assemble()
-        self.tags.clear()
-        self.token_to_tag.clear()
-        for line in self.assembler.parsed_code:
-            for token in line:
-                start = "{}.{}".format(token.position.lineno + 1,
-                                       token.position.start_index)
-                end = "{}.{}".format(token.position.lineno + 1,
-                                     token.position.end_index)
-                self.text.tag_add(token.style, start, end)
-                self.text.tag_add(self.create_tag(token), start, end)
-                p = self.create_problem_tag(token)
-                if p:
-                    self.text.tag_add(p, start, end)
+        code = self.text.get("1.0", "end")[:-1]
+        if code:
+            self.assembler.update_code(code)
+            self.assembler.assemble()
+            self.tags.clear()
+            self.token_to_tag.clear()
+            for line in self.assembler.parsed_code:
+                for token in line:
+                    start = "{}.{}".format(token.position.lineno + 1,
+                                        token.position.start_index)
+                    end = "{}.{}".format(token.position.lineno + 1,
+                                        token.position.end_index)
+                    self.text.tag_add(token.style, start, end)
+                    self.text.tag_add(self.create_tag(token), start, end)
+                    p = self.create_problem_tag(token)
+                    if p:
+                        self.text.tag_add(p, start, end)
         self.highlight()
+        self.update_sidebars()
+
+    def set_linebar_mode(self, mode):
+        if mode is LineBarMode.none:
+            self.linebar.grid_forget()
+            self.sideframe.columnconfigure(0, weight=0)
+        else:
+            self.linebar.grid(column=0, row=0, sticky=tkinter.N + tkinter.S)
+            self.sideframe.columnconfigure(0, weight=1)
+        self.update_sidebars()
+
+    def breakpoints_changed(self):
+        pass
+
+    @catch_crash
+    def update_sidebars(self):
+        self.breakbar["state"] = "normal"
+        self.linebar["state"] = "normal"
+        current_lines = int(self.text.index("end").split(".")[0]) - 1
+        new_to_old = {}
+        stat = {}
+        new_breakpoints = collections.defaultdict(lambda: runner.BreakpointState.off)
+        print(self.text.mark_names())
+        print(*sorted((m, int(self.text.index(m).split(".")[0]) - 1) for m in self.sidebar_markers), sep="\n")
+        for m in sorted(self.sidebar_markers, key=lambda a: int(a.split("_")[1])):
+            new = int(self.text.index(m).split(".")[0]) - 1
+            old = int(m[m.rfind("_") + 1:])
+            stat[m] = old, new
+            if new not in new_to_old:
+                new_to_old[new] = old
+                new_breakpoints[new] = self.breakpoints[old]
+            else:
+                print("DUP", m, old, new)
+        print(self.breakpoints, new_breakpoints)
+        for m, (old, new) in sorted(stat.items(), key=lambda a: int(a[0].split("_")[1])):
+            if old in new_to_old.values():
+                print(old, "==>", new)
+            else:
+                print(old, "==X")
+        if self.breakpoints != new_breakpoints:
+            self.breakpoints = new_breakpoints
+            self.breakpoints_changed()
+
+        for m in self.sidebar_markers:
+            self.text.mark_unset(m)
+        self.sidebar_markers.clear()
+        for line in range(current_lines):
+            self.sidebar_markers.add("sidebarmark_" + str(line))
+            self.text.mark_set("sidebarmark_" + str(line), str(line + 1) + ".0")
+
+        # Preserve scrolling position
+        posx, posy = self.text.xview()[0], self.text.yview()[0]
+        print("POS", posx, posy)
+
+        # Linebar
+        if self.linebar_type is not LineBarMode.none:
+            self.linebar.delete("1.0", "end")
+            if self.linebar_type is LineBarMode.lineno:
+                sideinfo = list(map(str, range(current_lines)))
+            elif self.linebar_type is LineBarMode.address:
+                sideinfo = []
+                if hasattr(self.assembler, "parsed_code"):
+                    for lineno in range(current_lines):
+                        if lineno in new_to_old and new_to_old[lineno] < len(self.assembler.parsed_code):
+                            tokens = self.assembler.parsed_code[new_to_old[lineno]]
+                        else:
+                            tokens = []
+                        mnems = [i for i in tokens if isinstance(i, assembler.Mnemonic)]
+                        if mnems:
+                            sideinfo.append(str(mnems[0].address))
+                        else:
+                            sideinfo.append("")
+                while len(sideinfo) < current_lines:
+                    sideinfo.append("")
+            self.linebar.insert("end", "\n".join(sideinfo))
+            self.linebar["width"] = max(map(len, sideinfo))
+
+        # Breakpoint bar
+        self.breakbar.delete("1.0", "end")
+        breakinfo = []
+        for lineno in range(current_lines):
+            breakinfo.append(BREAKPOINT_SHORTENED[self.breakpoints[lineno]])
+        self.breakbar.insert("end", "\n".join(breakinfo))
+
+        self.text.tag_remove("breakpoint", "1.0", "end")
+        for lineno, type in self.breakpoints.items():
+            if type != runner.BreakpointState.off:
+                self.text.tag_add("breakpoint", "{}.0".format(lineno + 1), "{}.0".format(lineno + 2))
+
+        self.breakbar["state"] = "disabled"
+        self.linebar["state"] = "disabled"
+
+        self.yscroll(None, posy, posx, yxmode=True)
+
+    def change_breakpoint(self, event):
+        self.changing_breakpoint_lineno = int(self.breakbar.index("current").split(".")[0]) - 1
+        self.change_breakpoint_var.set(self.breakpoints[self.changing_breakpoint_lineno].value)
+        self.change_breakpoint_menu.post(event.x_root, event.y_root)
+
+    def do_change_breakpoint(self):
+        value = self.change_breakpoint_var.get()
+        self.breakpoints[self.changing_breakpoint_lineno] = runner.BreakpointState(value)
+        self.update_sidebars()
 
     def start_syntax_update_timer(self):
         if self.syntax_update_reg is not None:
@@ -543,6 +745,7 @@ class CodeEditor(tkinter.Frame):
         self.start_highlight_timer(force=True)
         if stuff[1] != "mark":
             self.start_syntax_update_timer()
+            self.update_sidebars()
         self.set_name()
         #self.after(1, self.do_thing)
 

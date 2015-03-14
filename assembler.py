@@ -352,7 +352,7 @@ class Assembler:
 
         # Extra warnings
 
-        if not any(isinstance(token, Mnemonic) and token.mnemonic == "HLT" for token in self.tokens):
+        if self.tokens and not any(isinstance(token, Mnemonic) and token.mnemonic == "HLT" for token in self.tokens):
             self.tokens[-1].problems.append(problems.RuntimeWarning("No HLT instruction", self.tokens[-1].position))
 
         for bra in filter(lambda tok: tok.mnemonic == "BRA", self.instructions):

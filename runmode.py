@@ -4,6 +4,7 @@ from tkinter import (filedialog as fdialog, scrolledtext as stext,
 import math
 import functools
 import runner
+import codeeditor
 import dbgcodeeditor
 
 
@@ -69,10 +70,13 @@ class MemoryDisplay(tkinter.Frame):
         for i, m in enumerate(runner.memory):
             self.mem_vars[i].set(str(m.value).zfill(3))
 
-    def set_colors(self, runner):
-        for i, m in enumerate(runner.memory):
+    def set_colors(self, runner_):
+        for i, m in enumerate(runner_.memory):
             self.memory_nums[i]["readonlybackground"] = dbgcodeeditor.darken(dbgcodeeditor.COLOR_MAP[m.state])
             self.memorys[i]["bg"] = dbgcodeeditor.COLOR_MAP[m.state]
+            if m.state == runner.ValueState.normal and m.breakpoint != runner.BreakpointState.off:
+                self.memory_nums[i]["readonlybackground"] = dbgcodeeditor.darken(codeeditor.BREAKPOINT_BG_COLOR)
+                self.memorys[i]["bg"] = codeeditor.BREAKPOINT_BG_COLOR
 
 
 class RunMode(tkinter.Frame):
@@ -209,6 +213,8 @@ class RunMode(tkinter.Frame):
         self.output.tag_configure("debug_input", font=bold_font)
         self.output.tag_configure("debug_error", font=bold_font,
                                   foreground="red")
+        self.output.tag_configure("debug_breakpoint", font=bold_font,
+                                  foreground="red")
         self.output.tag_configure("debug_done", font=bold_font)
 
         tkinter.Label(self.control_frame, text="Speed:").grid(row=4,
@@ -321,6 +327,9 @@ class RunMode(tkinter.Frame):
         self.update_output()
         if ret is runner.HaltReason.hlt:
             self.run_to_halt = False
+        elif ret is runner.HaltReason.breakpoint:
+            self.run_to_halt = False
+            self.give_output("Hit breakpoint at {:03}".format(self.runner.instruction_addr), type="debug_breakpoint")
         elif ret == runner.HaltReason.input:
             self.get_input()
         return ret
@@ -449,6 +458,14 @@ class RunMode(tkinter.Frame):
         self.runner.reset()
         self.set_colors()
         self.update_output()
+
+    def set_breakpoints(self, brps):
+        self.code_editor.breakpoints = brps
+        self.code_editor.breakpoints_changed()
+
+    def breakpoints_changed(self, brps):
+        self.runner.load_breakpoints(brps)
+        self.after(1, self.set_colors)
 
     def do_bindings(self):
         pass

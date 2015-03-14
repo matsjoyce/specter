@@ -48,6 +48,7 @@ class DebugCodeEditor(codeeditor.CodeEditor):
         for state, color in COLOR_MAP.items():
             self.text.tag_configure("state_" + state.value, background=color)
         self.text.tag_raise("sel")
+        self.text.tag_lower("state_" + runner.ValueState.normal.value)
         self.text["state"] = "disabled"
 
     def update_runner(self, runner):
@@ -94,6 +95,13 @@ class DebugCodeEditor(codeeditor.CodeEditor):
 
     def set_name(self):
         pass
+
+    def breakpoints_changed(self):
+        master = self.master
+        while hasattr(master, "master"):
+            if hasattr(master, "breakpoints_changed"):
+                return master.breakpoints_changed(self.breakpoints)
+            master = master.master
 
 
 if __name__ == "__main__":
