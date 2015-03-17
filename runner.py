@@ -99,6 +99,10 @@ class MemoryValue:
 class Runner:
     def __init__(self, give_output):
         self.give_output = give_output
+        self.breakpoints_active = False
+        self.memory = []
+        self.accumulator = MemoryValue("accumulator")
+        self.counter = 0
 
     def load_code(self, assembler):
         self.assembler = assembler
@@ -110,7 +114,7 @@ class Runner:
             self.memory.append(MemoryValue(i, v))
         while len(self.memory) < 100:
             self.memory.append(MemoryValue(len(self.memory)))
-        self.accumulator = MemoryValue("accumulator")
+        self.accumulator.reset()
         self.breakables = self.memory + [self.accumulator]
         self.reset()
 
@@ -209,7 +213,7 @@ class Runner:
         else:
             raise RuntimeError("Invalid instruction {:03}".format(instruction))
 
-        if self.halt_reason == HaltReason.step and self.hit_breakpoints():
+        if self.halt_reason == HaltReason.step and self.breakpoints_active and self.hit_breakpoints():
             self.halt_reason = HaltReason.breakpoint
 
         return self.halt_reason

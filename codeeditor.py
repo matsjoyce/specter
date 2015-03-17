@@ -263,6 +263,7 @@ class CodeEditor(tkinter.Frame):
         self.tooltip_token = self.tooltip = self.tooltip_reg = self.tooltip_xy = None
         self.highlighted_tokens = []
         self.highlight_reg = self.syntax_update_reg = None
+        self.highlight_force = False
 
         self.hovered_token_mode = "cursor"
 
@@ -867,6 +868,12 @@ class CodeEditor(tkinter.Frame):
         print("Deindent from", charno, "by", spaces, "to", charno - spaces)
         self.text.delete("insert-{}c".format(spaces), "insert")
         return "break"
+
+    def show_breakpoints(self, value):
+        if value:
+            self.text.tag_configure("breakpoint", background=BREAKPOINT_BG_COLOR)
+        else:
+            self.text.tag_configure("breakpoint", background="white")
 
 if __name__ == "__main__":
     import sys

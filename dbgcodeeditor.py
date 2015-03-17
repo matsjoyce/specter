@@ -45,6 +45,7 @@ class DbgTooltip(codeeditor.Tooltip):
 class DebugCodeEditor(codeeditor.CodeEditor):
     def __init__(self, master):
         super().__init__(master)
+        self.runner = None
         for state, color in COLOR_MAP.items():
             self.text.tag_configure("state_" + state.value, background=color)
         self.text.tag_raise("sel")
@@ -68,14 +69,15 @@ class DebugCodeEditor(codeeditor.CodeEditor):
         super().update_syntax()
         for state in runner.ValueState:
             self.text.tag_remove("state_" + state.value, "1.0", tkinter.END)
-        for val in self.runner.memory:
-            if val.token is None:
-                continue
-            print(val.token.position.lineno, val.state)
-            lineno = val.token.position.lineno + 1
-            self.text.tag_add("state_" + val.state.value,
-                              str(lineno) + ".0",
-                              str(lineno + 1) + ".0")
+        if self.runner:
+            for val in self.runner.memory:
+                if val.token is None:
+                    continue
+                print(val.token.position.lineno, val.state)
+                lineno = val.token.position.lineno + 1
+                self.text.tag_add("state_" + val.state.value,
+                                str(lineno) + ".0",
+                                str(lineno + 1) + ".0")
         self.text["state"] = "disabled"
 
     def make_tooltip(self, token):

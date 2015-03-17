@@ -75,7 +75,9 @@ class MemoryDisplay(tkinter.Frame):
         for i, m in enumerate(runner_.memory):
             self.memory_nums[i]["readonlybackground"] = dbgcodeeditor.darken(dbgcodeeditor.COLOR_MAP[m.state])
             self.memorys[i]["bg"] = dbgcodeeditor.COLOR_MAP[m.state]
-            if m.state == runner.ValueState.normal and m.breakpoint != runner.BreakpointState.off:
+            if (runner_.breakpoints_active
+               and m.state == runner.ValueState.normal
+               and m.breakpoint != runner.BreakpointState.off):
                 self.memory_nums[i]["readonlybackground"] = dbgcodeeditor.darken(codeeditor.BREAKPOINT_BG_COLOR)
                 self.memorys[i]["bg"] = codeeditor.BREAKPOINT_BG_COLOR
 
@@ -97,25 +99,26 @@ class RunMode(tkinter.Frame):
                                sticky=tkinter.E + tkinter.W + tkinter.N)
 
         self.run_to_hlt_btn = tkinter.Button(self.button_frame,
-                                             text="Run to halt",
+                                             text="Run",
                                              command=self.run_to_hlt)
         self.run_to_hlt_btn.grid(row=0, column=0, sticky=tkinter.E + tkinter.W,
                                  padx=2, pady=2)
 
         self.run_step_btn = tkinter.Button(self.button_frame,
-                                           text="Run one step",
+                                           text="Step",
                                            command=self.next_step)
         self.run_step_btn.grid(row=0, column=1, sticky=tkinter.E + tkinter.W,
                                padx=2, pady=2)
 
-        self.pause_btn = tkinter.Button(self.button_frame, text="Pause",
-                                        command=self.pause)
-        self.pause_btn.grid(row=0, column=2, sticky=tkinter.E + tkinter.W,
-                            padx=2, pady=2)
-
         self.reset_btn = tkinter.Button(self.button_frame, text="Reset",
                                         command=self.reset)
-        self.reset_btn.grid(row=0, column=3, sticky=tkinter.E + tkinter.W,
+        self.reset_btn.grid(row=0, column=2, sticky=tkinter.E + tkinter.W,
+                            padx=2, pady=2)
+
+        self.debug_var = tkinter.BooleanVar(value=False)
+        self.debug_btn = tkinter.Button(self.button_frame,
+                                        command=self.toggle_debug, text="Debug")
+        self.debug_btn.grid(row=0, column=3, sticky=tkinter.E + tkinter.W,
                             padx=2, pady=2)
 
         switch_cmd = getattr(self.master, "codemode", lambda: None)
@@ -231,16 +234,6 @@ class RunMode(tkinter.Frame):
         self.speed_scale.grid(row=4, column=1,
                               sticky=tkinter.E + tkinter.W, padx=10)
 
-        tkinter.Label(self.control_frame, text="Debug:").grid(row=5,
-                                                              column=0,
-                                                              sticky=tkinter.W)
-
-        self.debug_var = tkinter.BooleanVar(value=False)
-        vcmd = self.register(self.counter_changed), "%P", "%V"
-        self.debug_btn = tkinter.Button(self.control_frame,
-                                        command=self.toggle_debug, text="Off")
-        self.debug_btn.grid(row=5, column=1, sticky=tkinter.W, padx=10, pady=5)
-
         self.control_frame.columnconfigure(1, weight=1)
         self.control_frame.rowconfigure(3, weight=1)
 
@@ -275,6 +268,8 @@ class RunMode(tkinter.Frame):
         self.run_menu.add_command(label="Step", command=self.next_step)
         self.run_menu.add_command(label="Reset", command=self.reset)
         self.menus.append(dict(label="Run", menu=self.run_menu))
+
+        self.breakpoints_active = False
 
     def unfocus_tabber_widget(self, *e):
         self.memory_frame.memory_nums[0].selection_clear()
@@ -341,6 +336,20 @@ class RunMode(tkinter.Frame):
         i = int(self.speed_scale.get() * 1000)
         self.after(i, self.run_halt_check)
 
+    @property
+    def run_to_halt(self):
+        return self._run_to_halt
+
+    @run_to_halt.setter
+    def run_to_halt(self, value):
+        self._run_to_halt = value
+        if not hasattr(self, "run_to_hlt_btn"):
+            return
+        if value:
+            self.run_to_hlt_btn.config(text="Stop", command=self.pause)
+        else:
+            self.run_to_hlt_btn.config(text="Run ", command=self.run_to_hlt)
+
     def run_to_hlt(self):
         self.run_to_halt = True
 
@@ -361,9 +370,11 @@ class RunMode(tkinter.Frame):
     def toggle_debug(self):
         self.show_debug = not self.show_debug
         if self.show_debug:
-            self.debug_btn.config(relief="sunken", text="On")
+            self.debug_btn.config(relief="sunken")
+            self.breakpoints_active = True
         else:
-            self.debug_btn.config(relief="raised", text="Off")
+            self.debug_btn.config(relief="raised")
+            self.breakpoints_active = False
         self.update_output()
 
     def give_output(self, i, type="output"):
@@ -470,6 +481,18 @@ class RunMode(tkinter.Frame):
     def breakpoints_changed(self, brps):
         self.runner.load_breakpoints(brps)
         self.after(1, self.set_colors)
+
+    @property
+    def breakpoints_active(self):
+        return self._breakpoints_active
+
+    @breakpoints_active.setter
+    def breakpoints_active(self, value):
+        print("Breakpoints active:", value)
+        self._breakpoints_active = value
+        self.runner.breakpoints_active = value
+        self.code_editor.show_breakpoints(value)
+        self.update_memory()
 
     def do_bindings(self):
         pass
