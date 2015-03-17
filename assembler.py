@@ -29,7 +29,7 @@ MNEMONIC_INFO = {
             "or"),
     "DAT": ("xxx", "Data declaration  ", "Sets the value at its address to `"
             "xxx`. Defaults to `0` [2]")
-    }
+}
 
 
 class Position:
@@ -309,7 +309,8 @@ class Assembler:
                             tok_problems.append(problems.SyntaxError("Multiple labels for one line", position))
                         if token in self.labels:
                             linked_token = self.labels[token][1]
-                            tok_problems.append(problems.SemanticError("Label already defined", position, extra=("First defined", linked_token)))
+                            tok_problems.append(problems.SemanticError("Label already defined", position,
+                                                                       extra=("First defined", linked_token)))
                         l = Label(token, position, problems=tok_problems)
                         if token not in self.labels:
                             self.labels[token] = (None, l)
@@ -343,7 +344,8 @@ class Assembler:
                         if token.takes_arg:
                             token.link_arg(arg)
                         elif not token.needs_arg:
-                            token.problems.append(problems.SyntaxError("Mnemonic does not take an argument", token.position))
+                            token.problems.append(problems.SyntaxError("Mnemonic does not take an argument",
+                                                                       token.position))
                     else:
                         if token.needs_arg:
                             token.problems.append(problems.SyntaxError("Mnemonic takes an argument", token.position))
@@ -363,14 +365,18 @@ class Assembler:
                     if mnem.mnemonic in ("BRP", "BRZ", "BRA"):
                         break
                 else:
-                    bra.problems.append(problems.RuntimeWarning("Possible infinite loop", bra.position, extra=("Starting at", self.instructions[bra.arg.resolve()])))
+                    bra.problems.append(problems.RuntimeWarning("Possible infinite loop", bra.position,
+                                                                extra=("Starting at",
+                                                                       self.instructions[bra.arg.resolve()])))
 
         for instr in filter(lambda tok: tok.mnemonic != "DAT", self.instructions):
             if instr.arg and isinstance(instr.arg, Number):
                 if instr.arg.capped_value >= len(self.instructions):
-                    instr.problems.append(problems.RuntimeWarning("Argument does not point at a initialised position", instr.position))
+                    instr.problems.append(problems.RuntimeWarning("Argument does not point at a initialised position",
+                                                                  instr.position))
                 else:
-                    instr.problems.append(problems.StyleWarning("Use labels instead of numerical addresses", instr.position))
+                    instr.problems.append(problems.StyleWarning("Use labels instead of numerical addresses",
+                                                                instr.position))
 
         last_dats = []
         for instr in self.instructions:
@@ -386,7 +392,9 @@ class Assembler:
                 if 0 <= instr.arg.resolve() < len(self.instructions):
                     i = self.instructions[instr.arg.resolve()]
                     if i.mnemonic != "DAT":
-                        instr.problems.append(problems.RuntimeWarning("{} will not {} a DAT instruction".format(instr.mnemonic, "store to" if instr.mnemonic == "STA" else "load from"), instr.position))
+                        phrase = "store to" if instr.mnemonic == "STA" else "load from"
+                        msg = "{} will not {} a DAT instruction".format(instr.mnemonic, phrase)
+                        instr.problems.append(problems.RuntimeWarning(msg, instr.position))
 
         self.in_error = any(token.in_error for token in self.tokens)
         self.parsed = True

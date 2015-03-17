@@ -151,9 +151,10 @@ under certain conditions. Type `yaplmc --licence` for details.
     arg_parser.add_argument("-V", "--version", help="display version",
                             action="store_true")
 
-    cli_group = arg_parser.add_argument_group("CLI options (all options only active when -c or --cli used)")
+    cli_group = arg_parser.add_argument_group("CLI options (all options only"
+                                              " active when -c or --cli used)")
     cli_group.add_argument("-c", "--cli", help="use CLI mode",
-                            action="store_true")
+                           action="store_true")
     cli_group.add_argument("-d", "--debug", help="debug level"
                            " (repeat for more info, 3 is the max)",
                            action="count", default=0)

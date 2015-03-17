@@ -355,10 +355,13 @@ class CodeEditor(tkinter.Frame):
 
         self.change_breakpoint_menu = tkinter.Menu(self.breakbar, tearoff=0)
         for option in runner.BreakpointState:
-            self.change_breakpoint_menu.add_radiobutton(label=option.value.title(), variable=self.change_breakpoint_var, value=option.value, command=self.do_change_breakpoint)
+            self.change_breakpoint_menu.add_radiobutton(label=option.value.title(),
+                                                        variable=self.change_breakpoint_var,
+                                                        value=option.value,
+                                                        command=self.do_change_breakpoint)
 
         self.breakbar.bind("<Button-3>", self.change_breakpoint)
-        self.change_breakpoint_menu.bind("<Leave>", lambda *a:self.change_breakpoint_menu.unpost())
+        self.change_breakpoint_menu.bind("<Leave>", lambda *a: self.change_breakpoint_menu.unpost())
 
         self.set_name()
 
@@ -367,7 +370,8 @@ class CodeEditor(tkinter.Frame):
     def open(self, fname=None):
         print("open")
         if not fname:
-            fname = filedialog.askopenfilename(parent=self, defaultextension=".lmc", filetypes=[("LMC files", ".lmc"), ("All files", "*")])
+            fname = filedialog.askopenfilename(parent=self, defaultextension=".lmc",
+                                               filetypes=[("LMC files", ".lmc"), ("All files", "*")])
         self.fname = fname
         self.text.delete("1.0", tkinter.END)
         self.text.insert(tkinter.END, open(fname).read())
@@ -389,14 +393,16 @@ class CodeEditor(tkinter.Frame):
 
     def saveas(self, *discard):
         print("saveas")
-        fname = filedialog.asksaveasfilename(parent=self, defaultextension=".lmc", filetypes=[("LMC files", ".lmc"), ("All files", "*")])
+        fname = filedialog.asksaveasfilename(parent=self, defaultextension=".lmc",
+                                             filetypes=[("LMC files", ".lmc"), ("All files", "*")])
         if fname:
             self.fname = fname
             self.save()
 
     def close(self, *discard):
         if self.text.edit_modified():
-            save = messagebox.askyesnocancel(title="Close file", message="File {} has unsaved changes. Save?".format(self.fname))
+            save = messagebox.askyesnocancel(title="Close file",
+                                             message="File {} has unsaved changes. Save?".format(self.fname))
             if save is None:
                 return False
             elif save is True:
@@ -481,9 +487,9 @@ class CodeEditor(tkinter.Frame):
             for line in self.assembler.parsed_code:
                 for token in line:
                     start = "{}.{}".format(token.position.lineno + 1,
-                                        token.position.start_index)
+                                           token.position.start_index)
                     end = "{}.{}".format(token.position.lineno + 1,
-                                        token.position.end_index)
+                                         token.position.end_index)
                     self.text.tag_add(token.style, start, end)
                     self.text.tag_add(self.create_tag(token), start, end)
                     p = self.create_problem_tag(token)
@@ -534,7 +540,7 @@ class CodeEditor(tkinter.Frame):
             self.breakpoints = new_breakpoints
             self.breakpoints_changed()
         else:
-            print("Breakpoints not changed", sorted(self.breakpoints.items())==sorted(new_breakpoints.items()))
+            print("Breakpoints not changed", sorted(self.breakpoints.items()) == sorted(new_breakpoints.items()))
 
         for m in self.sidebar_markers:
             self.text.mark_unset(m)
@@ -759,15 +765,15 @@ class CodeEditor(tkinter.Frame):
             self.start_syntax_update_timer()
             self.update_sidebars()
         self.set_name()
-        #self.after(1, self.do_thing)
-
-    #def do_thing(self):
-        #print("B")
-        #if self.text.edit_modified():
-            #self.text["background"] = "green"
-        #else:
-            #self.text["background"] = "white"
-        #print("A")
+#        self.after(1, self.do_thing)
+#
+#    def do_thing(self):
+#        print("B")
+#        if self.text.edit_modified():
+#            self.text["background"] = "green"
+#        else:
+#            self.text["background"] = "white"
+#        print("A")
 
     def leave(self, event):
         print("Leave", event.x, event.y, self)
@@ -863,13 +869,13 @@ class CodeEditor(tkinter.Frame):
         return "break"
 
 if __name__ == "__main__":
-    import sys, tkinter.ttk as ttk
+    import sys
+    import tkinter.ttk as ttk
     root = tkinter.Tk(className='ToolTip-demo')
     t = ttk.Notebook(root)
     t.grid(sticky=tkinter.NE + tkinter.SW)
     ce = CodeEditor(t)
     t.add(ce, text="Hi")
-    #ce.grid(sticky=tkinter.NE + tkinter.SW)
 
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)

@@ -105,7 +105,8 @@ class DebugCodeEditor(codeeditor.CodeEditor):
 
 
 if __name__ == "__main__":
-    import sys, tkinter.ttk as ttk
+    import sys
+    import tkinter.ttk as ttk
     assem = assembler.Assembler()
     assem.update_code(open(sys.argv[1]).read())
     print(assem.assemble())
@@ -119,9 +120,10 @@ if __name__ == "__main__":
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)
     ce.update_runner(runner_)
+
     def c():
         runner_.next_step()
         ce.update_syntax()
-    b=tkinter.Button(root, text="Step", command=c)
+    b = tkinter.Button(root, text="Step", command=c)
     b.grid()
     root.mainloop()

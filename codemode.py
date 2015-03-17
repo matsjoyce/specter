@@ -87,11 +87,16 @@ class CodeMode(tkinter.Frame):
         self.menus.append(dict(label="Code", menu=self.code_menu))
 
         self.button_box = tkinter.Frame(self, bg="red")
-        tkinter.Button(self.button_box, text="New", command=self.new).grid(row=0, column=0, sticky=tkinter.E + tkinter.W)
-        tkinter.Button(self.button_box, text="Open", command=self.open).grid(row=0, column=1, sticky=tkinter.E + tkinter.W)
-        tkinter.Button(self.button_box, text="Save", command=self.save_current).grid(row=0, column=2, sticky=tkinter.E + tkinter.W)
-        tkinter.Button(self.button_box, text="Close", command=self.close_current).grid(row=0, column=3, sticky=tkinter.E + tkinter.W)
-        tkinter.Button(self.button_box, text="Assemble", command=self.assemble).grid(row=0, column=4, sticky=tkinter.E + tkinter.W)
+        tkinter.Button(self.button_box, text="New", command=self.new).grid(row=0, column=0,
+                                                                           sticky=tkinter.E + tkinter.W)
+        tkinter.Button(self.button_box, text="Open", command=self.open).grid(row=0, column=1,
+                                                                             sticky=tkinter.E + tkinter.W)
+        tkinter.Button(self.button_box, text="Save", command=self.save_current).grid(row=0, column=2,
+                                                                                     sticky=tkinter.E + tkinter.W)
+        tkinter.Button(self.button_box, text="Close", command=self.close_current).grid(row=0, column=3,
+                                                                                       sticky=tkinter.E + tkinter.W)
+        tkinter.Button(self.button_box, text="Assemble", command=self.assemble).grid(row=0, column=4,
+                                                                                     sticky=tkinter.E + tkinter.W)
         self.button_box.grid(row=0, column=0, sticky=tkinter.NE + tkinter.W)
         self.button_box.rowconfigure(0, weight=1)
         for i in range(5):

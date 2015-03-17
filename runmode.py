@@ -36,7 +36,8 @@ class MemoryDisplay(tkinter.Frame):
             col = int(math.floor(i / self.per_thing))
             row = i % self.per_thing
 
-            mn = tkinter.Entry(self, width=2, bg="white", borderwidth=0, selectbackground="white", selectforeground="black")
+            mn = tkinter.Entry(self, width=2, bg="white", borderwidth=0,
+                               selectbackground="white", selectforeground="black")
             mn.grid(row=row, column=col * 2, sticky=STICKY_NESW)
             mn.insert(0, str(i).zfill(2))
             self.memory_nums.append(mn)
@@ -392,7 +393,10 @@ class RunMode(tkinter.Frame):
         self.output.delete("1.0", tkinter.END)
         for text, type in self.all_output:
             tag = type
-            out = lambda x: self.output.insert(tkinter.END, x + "\n", tag)
+
+            def out(x):
+                self.output.insert(tkinter.END, x + "\n", tag)
+
             if self.show_debug:
                 if not type.startswith("debug_"):
                     tag = "debug_" + type

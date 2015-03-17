@@ -229,7 +229,8 @@ class Runner:
         self.memory[self.counter].next_exec()
 
 if __name__ == "__main__":
-    import sys, assembler
+    import sys
+    import assembler
     assem = assembler.Assembler()
     assem.update_code(open(sys.argv[1]).read())
     print(assem.assemble())
