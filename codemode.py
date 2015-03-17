@@ -111,10 +111,12 @@ class CodeMode(tkinter.Frame):
     def do_bindings(self):
         self.bind_all("<Control-s>", self.save_current)
         self.bind_all("<Control-S>", self.saveas_current)
+        self.bind_all("<F5>", self.assemble)
 
     def do_unbindings(self):
         self.unbind_all("<Control-s>")
         self.unbind_all("<Control-S>")
+        self.unbind_all("<F5>")
 
     def current_codeeditor(self):
         if self.tabber.tabs():
