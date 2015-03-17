@@ -364,8 +364,6 @@ class CodeEditor(tkinter.Frame):
         self.breakbar.bind("<Button-3>", self.change_breakpoint)
         self.change_breakpoint_menu.bind("<Leave>", lambda *a: self.change_breakpoint_menu.unpost())
 
-        self.set_name()
-
     # File-based stuff
 
     def open(self, fname=None):
@@ -796,18 +794,24 @@ class CodeEditor(tkinter.Frame):
         if token in self.token_to_tag:
             self.highlight_tag(self.token_to_tag[token])
 
-    def set_name(self):
+    @property
+    def display_name(self):
         if self.fname:
             name = os.path.relpath(self.fname, os.curdir)
         else:
             name = "New file"
         if self.text.edit_modified():
             name = "*[{}]".format(name)
+        return name
+
+    def set_name(self):
         if isinstance(self.master, ttk.Notebook):
             print("SN go")
             if str(self) in self.master.tabs():
                 print("SN do")
-                self.master.tab(self, text=name)
+                self.master.tab(self, text=self.display_name)
+            if hasattr(self.master.master, "on_tab_change"):
+                self.master.master.on_tab_change()
 
     def comment_line(self, *discard):
         print("CL")

@@ -104,6 +104,7 @@ class CodeMode(tkinter.Frame):
 
         self.tabber = ttk.Notebook(self, width=600, height=400)
         self.tabber.grid(row=1, column=0, sticky=tkinter.NE + tkinter.SW)
+        self.tabber.bind("<<NotebookTabChanged>>", self.on_tab_change)
 
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
@@ -141,6 +142,7 @@ class CodeMode(tkinter.Frame):
                 self.tabber.add(ce, sticky=tkinter.NE + tkinter.SW)
                 ce.open(fname)
                 ce.focus_set()
+                ce.set_name()
                 self.tabber.select(ce)
 
     def new(self, *e):
@@ -164,11 +166,13 @@ class CodeMode(tkinter.Frame):
         print("CM save")
         if self.codeeditors:
             return self.current_codeeditor().save()
+        self.on_tab_change()
 
     def saveas_current(self, *e):
         print("CM saveas")
         if self.codeeditors:
             return self.current_codeeditor().saveas()
+        self.on_tab_change()
 
     def reload_current(self, *e):
         print("CM save")
@@ -190,6 +194,9 @@ class CodeMode(tkinter.Frame):
         print("CM decomment")
         if self.codeeditors:
             return self.current_codeeditor().decomment_line()
+
+    def on_tab_change(self, *e):
+        self.master.set_title(self.current_codeeditor().display_name)
 
 if __name__ == "__main__":
     root = tkinter.Tk(className='ToolTip-demo')

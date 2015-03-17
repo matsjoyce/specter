@@ -86,6 +86,9 @@ class GUIManager(tkinter.Tk):
         ce.update_sidebars()
         self.update_menu(self.code_mode.menus)
 
+    def set_title(self, txt):
+        self.title("yaplmc - " + txt)
+
 
 def main_gui():
     t = GUIManager()
