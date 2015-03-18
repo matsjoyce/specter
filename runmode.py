@@ -269,6 +269,16 @@ class RunMode(tkinter.Frame):
         self.run_menu.add_command(label="Reset", command=self.reset)
         self.menus.append(dict(label="Run", menu=self.run_menu))
 
+        self.debug_trace_var = tkinter.BooleanVar()
+        self.breakpoints_active_var = tkinter.BooleanVar()
+
+        self.debug_menu = tkinter.Menu(self.master.menu, tearoff=False)
+        self.debug_menu.add_checkbutton(label="Debug trace", variable=self.debug_trace_var,
+                                        command=self.update_debug_from_vars)
+        self.debug_menu.add_checkbutton(label="Breapoints", variable=self.breakpoints_active_var,
+                                        command=self.update_debug_from_vars)
+        self.menus.append(dict(label="Debug", menu=self.debug_menu))
+
         self.breakpoints_active = False
 
     def unfocus_tabber_widget(self, *e):
@@ -368,14 +378,19 @@ class RunMode(tkinter.Frame):
         self.set_colors()
 
     def toggle_debug(self):
-        self.show_debug = not self.show_debug
-        if self.show_debug:
+        if self.show_debug or self.breakpoints_active:
+            self.show_debug = self.breakpoints_active = False
+        else:
+            self.show_debug = self.breakpoints_active = True
+        self.update_output()
+        self.update_debug_button()
+        self.debug_trace_var.set(self.show_debug)
+
+    def update_debug_button(self):
+        if self.show_debug or self.breakpoints_active:
             self.debug_btn.config(relief="sunken")
-            self.breakpoints_active = True
         else:
             self.debug_btn.config(relief="raised")
-            self.breakpoints_active = False
-        self.update_output()
 
     def give_output(self, i, type="output"):
         if isinstance(i, int):
@@ -490,9 +505,16 @@ class RunMode(tkinter.Frame):
     def breakpoints_active(self, value):
         print("Breakpoints active:", value)
         self._breakpoints_active = value
+        self.breakpoints_active_var.set(value)
         self.runner.breakpoints_active = value
         self.code_editor.show_breakpoints(value)
         self.update_memory()
+
+    def update_debug_from_vars(self):
+        self.breakpoints_active = self.breakpoints_active_var.get()
+        self.show_debug = self.debug_trace_var.get()
+        self.update_output()
+        self.update_debug_button()
 
     def do_bindings(self):
         pass
