@@ -58,6 +58,11 @@ def catch_crash(f):
     return cc_wrapper
 
 
+def mouse_inside(widget):
+    return (0 <= (widget.winfo_pointerx() - widget.winfo_rootx()) < widget.winfo_width()
+            and 0 <= (widget.winfo_pointery() - widget.winfo_rooty()) < widget.winfo_height())
+
+
 class TooltipContentInterface:
     def __init__(self, tooltip, text_widget):
         self.tooltip = tooltip
@@ -185,8 +190,7 @@ class Tooltip(tkinter.Toplevel):
             self.destroy()
 
     def destroy_when_ready(self):
-        inside_self = (0 <= (self.winfo_pointerx() - self.winfo_rootx()) < self.winfo_width()
-                       and 0 <= (self.winfo_pointery() - self.winfo_rooty()) < self.winfo_height())
+        inside_self = mouse_inside(self)
         if not self.entered and not inside_self:
             self.withdraw()
             self.destroy()
@@ -354,7 +358,9 @@ class CodeEditor(tkinter.Frame):
 
         self.change_breakpoint_var = tkinter.StringVar()
 
-        self.change_breakpoint_menu = tkinter.Menu(self.breakbar, tearoff=0)
+        self.text_menu = tkinter.Menu(self.text, tearoff=0, takefocus=True)
+
+        self.change_breakpoint_menu = tkinter.Menu(self.text_menu, tearoff=0)
         for option in runner.BreakpointState:
             self.change_breakpoint_menu.add_radiobutton(label=option.value.title(),
                                                         variable=self.change_breakpoint_var,
@@ -362,7 +368,16 @@ class CodeEditor(tkinter.Frame):
                                                         command=self.do_change_breakpoint)
 
         self.breakbar.bind("<Button-3>", self.change_breakpoint)
-        self.change_breakpoint_menu.bind("<Leave>", lambda *a: self.change_breakpoint_menu.unpost())
+
+        self.text_menu.add_cascade(label="Breakpoint", menu=self.change_breakpoint_menu)
+        self.text_menu.add_separator()
+        self.text_menu.add_command(label="Comment line", command=self.comment_line)
+        self.text_menu.add_command(label="Decomment line", command=self.decomment_line)
+        self.text_menu.add_separator()
+        self.text_menu.add_command(label="Indent line", command=self.indent)
+        self.text_menu.add_command(label="Deindent line", command=self.deindent)
+
+        self.text.bind("<Button-3>", self.launch_text_menu)
 
     # File-based stuff
 
@@ -596,13 +611,18 @@ class CodeEditor(tkinter.Frame):
         self.yscroll(None, posy, posx, yxmode=True)
 
     def change_breakpoint(self, event):
-        self.changing_breakpoint_lineno = int(self.breakbar.index("current").split(".")[0]) - 1
-        self.change_breakpoint_var.set(self.breakpoints[self.changing_breakpoint_lineno].value)
-        self.change_breakpoint_menu.post(event.x_root, event.y_root)
+        self.breakbar.mark_set("insert", "current")
+        self.change_breakpoint_menu.tk_popup(event.x_root, event.y_root)
+
+    def launch_text_menu(self, event):
+        self.text.mark_set("insert", "current")
+        self.breakbar.mark_set("insert", self.text.index("current").split(".")[0] + ".0")
+        self.text_menu.tk_popup(event.x_root, event.y_root)
 
     def do_change_breakpoint(self):
         value = self.change_breakpoint_var.get()
-        self.breakpoints[self.changing_breakpoint_lineno] = runner.BreakpointState(value)
+        lineno = int(self.breakbar.index("insert").split(".")[0]) - 1
+        self.breakpoints[lineno] = runner.BreakpointState(value)
         self.breakpoints_changed()
         self.update_sidebars()
 
@@ -630,8 +650,7 @@ class CodeEditor(tkinter.Frame):
 
     def get_hovered_token(self):
         if self.hovered_token_mode == "cursor":
-            if not (0 <= (self.text.winfo_pointerx() - self.text.winfo_rootx()) < self.text.winfo_width()
-                    and 0 <= (self.text.winfo_pointery() - self.text.winfo_rooty()) < self.text.winfo_height()):
+            if not mouse_inside(self):
                 print("ght: pointer outside widget")
                 return
             print("ght: pointer !outside widget")
@@ -791,8 +810,7 @@ class CodeEditor(tkinter.Frame):
         rc = "{}.{}".format(row, col)
         self.text.see(rc)
         self.text.mark_set("insert", rc)
-        if token in self.token_to_tag:
-            self.highlight_tag(self.token_to_tag[token])
+        self.highlight(token)
 
     @property
     def display_name(self):
