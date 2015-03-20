@@ -151,8 +151,8 @@ under certain conditions. Type `yaplmc --licence` for details.
                             default=None)
     arg_parser.add_argument("-l", "--licence", help="display licence",
                             action="store_true")
-    arg_parser.add_argument("-V", "--version", help="display version",
-                            action="store_true")
+    arg_parser.add_argument("-V", "--version", version="yaplmc " + __version__,
+                            action="version")
 
     cli_group = arg_parser.add_argument_group("CLI options (all options only"
                                               " active when -c or --cli used)")
@@ -166,11 +166,7 @@ under certain conditions. Type `yaplmc --licence` for details.
 
     if args_from_parser.licence:
         print(__doc__.strip())
-        exit()
-    elif args_from_parser.version:
-        print("yaplmc", __version__)
-        exit()
-    if args_from_parser.cli:
+    elif args_from_parser.cli:
         exit(main_cli())
     else:
         exit(main_gui())
