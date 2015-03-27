@@ -90,17 +90,19 @@ class GUIManager(tkinter.Tk):
         self.title("yaplmc - " + txt)
 
 
-def main_gui():
+def main_gui(args_from_parser):
     t = GUIManager()
     t.mainloop()
     return 0
 
 
-def main_cli():
-    if args_from_parser.file:
-        code = open(args_from_parser.file).read()
-    else:
-        code = open(input("Filename: ")).read()
+def main_cli(args_from_parser):
+    try:
+        with open(args_from_parser.file or input("Filename: ")) as f:
+            code = f.read()
+    except IOError as e:
+        print("Could not open file:", e)
+        return 1
     print("Assembling...")
     assem = assembler.Assembler()
     assem.update_code(code)
@@ -130,7 +132,10 @@ def main_cli():
         except RuntimeError as e:
             print("Error", e.args[0])
         if run.halt_reason == runner.HaltReason.input:
-            run.give_input(int(input("<<< ")))
+            #try:
+                run.give_input(int(input("<<< ")))
+            #except (KeyboardInterrupt, EOFError):
+                #break
         if args_from_parser.debug >= 1:
             print(run.hint)
     return 0
@@ -153,6 +158,8 @@ under certain conditions. Type `yaplmc --licence` for details.
                             action="store_true")
     arg_parser.add_argument("-V", "--version", version="yaplmc " + __version__,
                             action="version")
+    arg_parser.add_argument("-b", "--buginfo", help="generate information"
+                            " about any crashed", action="store_true")
 
     cli_group = arg_parser.add_argument_group("CLI options (all options only"
                                               " active when -c or --cli used)")
@@ -166,7 +173,24 @@ under certain conditions. Type `yaplmc --licence` for details.
 
     if args_from_parser.licence:
         print(__doc__.strip())
-    elif args_from_parser.cli:
-        exit(main_cli())
+
+    if args_from_parser.buginfo:
+        import inquisitor
+        exc_catcher = inquisitor.Inquisitor()
+        rh = inquisitor.utils.ReportManager("bug_info", "bug_info_{no}.xml",
+                                            max_files_size=inquisitor.utils.MiB)
+        xml_h = inquisitor.handlers.XMLFileDumpHandler(reportmanager=rh)
+        exc_catcher.handlers.append(xml_h)
+        exc_catcher.watch_sys_excepthook()
+        exc_catcher.watch_tkinter_report_callback_exception()
+        if args_from_parser.cli:
+            tk_h = inquisitor.handlers.TkinterMessageHandler()
+            exc_catcher.handlers.append(tk_h)
+        else:
+            tk_h = inquisitor.handlers.TkinterMessageHandler()
+            exc_catcher.handlers.append(tk_h)
+
+    if args_from_parser.cli:
+        exit(main_cli(args_from_parser))
     else:
-        exit(main_gui())
+        exit(main_gui(args_from_parser))
