@@ -202,7 +202,8 @@ class CodeMode(tkinter.Frame):
             return self.current_codeeditor().decomment_line()
 
     def on_tab_change(self, *e):
-        self.master.set_title(self.current_codeeditor().display_name)
+        if self.codeeditors:
+            self.master.set_title(self.current_codeeditor().display_name)
 
 if __name__ == "__main__":
     root = tkinter.Tk(className='ToolTip-demo')
