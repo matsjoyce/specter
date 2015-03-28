@@ -1,5 +1,6 @@
 import tkinter
 from tkinter import font as tkfont
+import logging
 
 import codeeditor
 import assembler
@@ -14,6 +15,9 @@ NEXT_EXEC_COLOR = "#CCC"
 
 COLOR_MAP = dict(zip(runner.ValueState, ["#FFF", READ_COLOR, WRITTEN_COLOR,
                                          EXECUTED_COLOR, NEXT_EXEC_COLOR]))
+
+
+logger = logging.getLogger(__name__)
 
 
 def darken(s):
@@ -73,7 +77,6 @@ class DebugCodeEditor(codeeditor.CodeEditor):
             for val in self.runner.memory:
                 if val.token is None:
                     continue
-                print(val.token.position.lineno, val.state)
                 lineno = val.token.position.lineno + 1
                 self.text.tag_add("state_" + val.state.value,
                                 str(lineno) + ".0",
@@ -84,12 +87,12 @@ class DebugCodeEditor(codeeditor.CodeEditor):
         if self.tooltip:
             self.nuke_tooltip()
         if token and isinstance(token, assembler.Mnemonic):
-            print("Making tooltip")
+            logger.info("Making tooltip")
             x, y = self.text.winfo_pointerx(), self.text.winfo_pointery()
             pos = x + 20, y - 35
             self.tooltip = DbgTooltip(self, self.runner.memory[token.address], pos)
         else:
-            print("Did not make tooltip as nothing to show")
+            logger.info("Did not make tooltip as nothing to show")
 
     def create_problem_tag(self, token):
         # Disable problem underlining

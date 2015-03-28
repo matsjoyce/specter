@@ -125,9 +125,6 @@ class Runner:
             value.breakpoint = BreakpointState.off
             while brps and brps[0][0] <= instr.position.lineno:
                 value.breakpoint = brps.pop(0)[1]
-        print("BREAKPOINTS")
-        for i, value in enumerate(self.memory):
-            print(str(i).zfill(3), value.breakpoint)
 
     def give_input(self, i):
         if self.halt_reason == HaltReason.input:

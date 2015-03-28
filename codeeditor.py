@@ -10,6 +10,7 @@ import os
 import enum
 import random
 import traceback
+import logging
 
 
 # Colors from Kate theme
@@ -33,6 +34,8 @@ BREAKPOINT_SHORTENED = {
     runner.BreakpointState.on_next_execute: "NE"
 }
 
+logger = logging.getLogger(__name__)
+
 
 class LineBarMode(enum.Enum):
     none = "none"
@@ -47,15 +50,6 @@ def grouper(iterable, n, fillvalue=None):
     args = [iter(iterable)] * n
     return itertools.zip_longest(*args, fillvalue=fillvalue)
 
-
-def catch_crash(f):
-    def cc_wrapper(*args, **kwargs):
-        try:
-            return f(*args, **kwargs)
-        except Exception as e:
-            open("errors.log", "a").write(traceback.format_exc())
-            traceback.print_exc()
-    return cc_wrapper
 
 
 def mouse_inside(widget):
@@ -180,7 +174,6 @@ class Tooltip(tkinter.Toplevel):
         text_widget["cursor"] = self.orig_cursor
 
     def enter(self, event):
-        print("TE")
         self.entered = True
 
     def leave(self, event):
@@ -306,7 +299,7 @@ class CodeEditor(tkinter.Frame):
         self.hbar.grid(column=0, row=1, columnspan=2, sticky=tkinter.E + tkinter.W)
 
         self.text["xscrollcommand"] = lambda y, x: (self.nuke_tooltip(),
-                                                    self.hbar.set(y, x), print("MTT", x, y))
+                                                    self.hbar.set(y, x))
         self.text["yscrollcommand"] = functools.partial(self.yscroll, self.text, yxmode=True)
 
         self.columnconfigure(1, weight=1)
@@ -382,10 +375,11 @@ class CodeEditor(tkinter.Frame):
     # File-based stuff
 
     def open(self, fname=None):
-        print("open")
+        logger.info("Open file")
         if not fname:
             fname = filedialog.askopenfilename(parent=self, defaultextension=".lmc",
                                                filetypes=[("LMC files", ".lmc"), ("All files", "*")])
+        logger.info("Opening file {!r}", fname)
         self.fname = fname
         self.text.delete("1.0", tkinter.END)
         self.text.insert(tkinter.END, open(fname).read())
@@ -398,7 +392,7 @@ class CodeEditor(tkinter.Frame):
         self.text.xview_moveto(0.0)
 
     def save(self, *discard):
-        print("save")
+        logger.info("Saving to file {!r}", self.fname)
         if not self.fname:
             return self.saveas()
         open(self.fname, "w").write(self.text.get("1.0", "end").rstrip("\n") + "\n")
@@ -406,56 +400,54 @@ class CodeEditor(tkinter.Frame):
         self.set_name()
 
     def saveas(self, *discard):
-        print("saveas")
         fname = filedialog.asksaveasfilename(parent=self, defaultextension=".lmc",
                                              filetypes=[("LMC files", ".lmc"), ("All files", "*")])
         if fname:
+            logger.info("Saving to file {!r}", self.fname)
             self.fname = fname
             self.save()
+        else:
+            logger.info("Saving cancelled")
 
     def close(self, *discard):
+        logger.info("Closing")
         if self.text.edit_modified():
+            self.logger.info("File has been modified and not saved")
             save = messagebox.askyesnocancel(title="Close file",
                                              message="File {} has unsaved changes. Save?".format(self.fname))
             if save is None:
                 return False
             elif save is True:
                 self.save()
+            else:
+                self.logger.warning("Changes not saved")
         return True
 
     def reload(self, *discard):
+        logger.info("Reload")
         if self.close():
             self.open(self.fname)
 
     # Scrolling
 
-    @catch_crash
     def yscroll(self, w, *a, yxmode=False):
-        print(w, a, yxmode)
         self.nuke_tooltip()
         if w not in (self.hbar, self.vbar) and yxmode:
-            print("self.bars")
             self.hbar.set(*a)
             self.vbar.set(*a)
         if yxmode:
             if w != self.text:
-                print("self.text", a[0])
                 self.text.yview_moveto(a[0])
             if w != self.linebar:
-                print("self.linebar", a[0])
                 self.linebar.yview_moveto(a[0])
             if w != self.breakbar:
-                print("self.breakbar", a[0])
                 self.breakbar.yview_moveto(a[0])
         else:
             if w != self.text:
-                print("self.text", a)
                 self.text.yview(*a)
             if w != self.linebar:
-                print("self.linebar", a)
                 self.linebar.yview(*a)
             if w != self.breakbar:
-                print("self.breakbar", a)
                 self.breakbar.yview(*a)
 
     # Syntax highlighting
@@ -479,17 +471,12 @@ class CodeEditor(tkinter.Frame):
             self.text.tag_raise(pname)
             return pname
 
-    @catch_crash
     def update_syntax(self):
         self.dehighlight()
-        print("++++++++", self.text.tag_names())
         for tag in self.token_to_tag.values():
-            print(tag)
             self.text.tag_delete(tag)
         for tag in self.token_to_problem_tag.values():
-            print(tag)
             self.text.tag_delete(tag)
-        print("++++++++", self.text.tag_names())
         for tag in self.text.tag_names():
             self.text.tag_remove(tag, "1.0", tkinter.END)
         code = self.text.get("1.0", "end")[:-1]
@@ -524,7 +511,6 @@ class CodeEditor(tkinter.Frame):
     def breakpoints_changed(self):
         pass
 
-    @catch_crash
     def update_sidebars(self):
         self.breakbar["state"] = "normal"
         self.linebar["state"] = "normal"
@@ -532,8 +518,6 @@ class CodeEditor(tkinter.Frame):
         new_to_old = {}
         stat = {}
         new_breakpoints = collections.defaultdict(lambda: runner.BreakpointState.off)
-        print(self.text.mark_names())
-        print(*sorted((m, int(self.text.index(m).split(".")[0]) - 1) for m in self.sidebar_markers), sep="\n")
         for m in sorted(self.sidebar_markers, key=lambda a: int(a.split("_")[1])):
             new = int(self.text.index(m).split(".")[0]) - 1
             old = int(m[m.rfind("_") + 1:])
@@ -541,20 +525,10 @@ class CodeEditor(tkinter.Frame):
             if new not in new_to_old:
                 new_to_old[new] = old
                 new_breakpoints[new] = self.breakpoints[old]
-            else:
-                print("DUP", m, old, new)
-        print(self.breakpoints, new_breakpoints)
-        for m, (old, new) in sorted(stat.items(), key=lambda a: int(a[0].split("_")[1])):
-            if old in new_to_old.values():
-                print(old, "==>", new)
-            else:
-                print(old, "==X")
         if self.breakpoints != new_breakpoints:
-            print("Breakpoints changed")
+            logger.debug("Breakpoints changed")
             self.breakpoints = new_breakpoints
             self.breakpoints_changed()
-        else:
-            print("Breakpoints not changed", sorted(self.breakpoints.items()) == sorted(new_breakpoints.items()))
 
         for m in self.sidebar_markers:
             self.text.mark_unset(m)
@@ -565,7 +539,6 @@ class CodeEditor(tkinter.Frame):
 
         # Preserve scrolling position
         posx, posy = self.text.xview()[0], self.text.yview()[0]
-        print("POS", posx, posy)
 
         # Linebar
         if self.linebar_type is not LineBarMode.none:
@@ -629,11 +602,11 @@ class CodeEditor(tkinter.Frame):
     def start_syntax_update_timer(self):
         if self.syntax_update_reg is not None:
             self.stop_syntax_update_timer()
-        print("Starting syn_up timer")
+        logger.debug("Starting syntax update timer")
         self.syntax_update_reg = self.after(HOVER_TIME, self.update_syntax)
 
     def stop_syntax_update_timer(self):
-        print("Stopped syn_up timer")
+        logger.debug("Stopped syntax update timer")
         self.after_cancel(self.syntax_update_reg)
         self.syntax_update_reg = None
 
@@ -651,28 +624,19 @@ class CodeEditor(tkinter.Frame):
     def get_hovered_token(self):
         if self.hovered_token_mode == "cursor":
             if not mouse_inside(self):
-                print("ght: pointer outside widget")
+                logger.debug("Pointer outside widget")
                 return
-            print("ght: pointer !outside widget")
+            logger.debug("Pointer not outside widget")
             tag = self.get_tags_at_index("current", self.token_to_tag.values())
-            if len(tag) > 1:
-                print("Hum...", tag)
-            if not tag:
-                return
-            tag = tag[0]
-            pos = assembler.Position.from_string(tag.replace("token_at_", ""))
-            print(tag, pos)
-            return self.assembler.get_token_at(pos)
         else:
             tag = self.get_tags_at_index("insert", self.token_to_tag.values())
-            if len(tag) != 1:
-                print("Hum...", tag)
-            if not tag:
-                return
-            tag = tag[0]
-            pos = assembler.Position.from_string(tag.replace("token_at_", ""))
-            print(tag, pos)
-            return self.assembler.get_token_at(pos)
+        if len(tag) > 1:
+            raise RuntimeError("Hovering over more than one tag")
+        if not tag:
+            return
+        tag = tag[0]
+        pos = assembler.Position.from_string(tag.replace("token_at_", ""))
+        return self.assembler.get_token_at(pos)
 
     # Highlighting functions
 
@@ -681,12 +645,12 @@ class CodeEditor(tkinter.Frame):
         Moves highlighting to the next tag. When no tag is being hovered over
         no dehighlighting will take place unless force is True.
         """
-        print("Updating h")
+        logger.debug("Updating highlighting")
         force = force or self.highlight_force
         token = self.get_hovered_token()
         if isinstance(token, assembler.InteractiveToken):
             self.dehighlight()
-            print("Highlighting", token)
+            logger.debug("Highlighting {}", token)
             self.text.tag_raise(self.token_to_tag[token])
             self.highlighted_tokens.append(token)
             if isinstance(token, assembler.Label):
@@ -702,22 +666,21 @@ class CodeEditor(tkinter.Frame):
         else:
             if force:
                 self.dehighlight()
-            print("Nothing to highlight", token)
+            logger.debug("Nothing to highlight {}", token)
 
     def dehighlight(self):
-        print("Dehighlighting", self.highlighted_tokens)
         while self.highlighted_tokens:
             self.text.tag_lower(self.token_to_tag[self.highlighted_tokens.pop()])
 
     def start_highlight_timer(self, force=False):
         if self.highlight_reg is not None:
             self.stop_highlight_timer()
-        print("Starting h timer")
+        logger.debug("Starting highlighting timer")
         self.highlight_force = force
         self.highlight_reg = self.after(HOVER_TIME, self.highlight)
 
     def stop_highlight_timer(self):
-        print("Stopped h timer")
+        logger.debug("Stopped highlighting timer")
         self.after_cancel(self.highlight_reg)
         self.highlight_reg = None
 
@@ -727,18 +690,16 @@ class CodeEditor(tkinter.Frame):
         if self.tooltip:
             self.nuke_tooltip()
         if token and token.problems or isinstance(token, assembler.InteractiveToken):
-            print("Making tooltip")
+            logger.debug("Making tooltip")
             x, y = self.text.winfo_pointerx(), self.text.winfo_pointery()
             pos = x + 20, y - 35
             interactives = sorted(token.problems, key=lambda prob: prob.cat)
             if isinstance(token, assembler.InteractiveToken):
                 interactives.append(token)
             self.tooltip = Tooltip(self, interactives, pos)
-        else:
-            print("Did not make tooltip as nothing to show")
 
     def nuke_tooltip(self, *discard_args):
-        print("Nukeing tooltip")
+        logger.debug("Nukeing tooltip")
         if self.tooltip:
             self.tooltip.destroy_when_ready()
             self.tooltip = None
@@ -746,9 +707,8 @@ class CodeEditor(tkinter.Frame):
         self.stop_tooltip_timer()
 
     def update_tooltip(self):
-        print("Updating tooltip")
+        logger.debug("Updating tooltip")
         token = self.get_hovered_token()
-        print(token, self.tooltip_token)
         if token != self.tooltip_token:
             self.make_tooltip(token)
             self.tooltip_token = token
@@ -756,25 +716,25 @@ class CodeEditor(tkinter.Frame):
     def start_tooltip_timer(self):
         if self.tooltip_reg is not None:
             self.stop_tooltip_timer()
-        print("Started tooltip timer")
+        logger.debug("Started tooltip timer")
         self.tooltip_reg = self.after(HOVER_TIME, self.update_tooltip)
 
     def stop_tooltip_timer(self):
         if self.tooltip_reg:
-            print("Stopped tooltip timer")
+            logger.debug("Stopped tooltip timer")
             self.after_cancel(self.tooltip_reg)
             self.tooltip_reg = None
 
     # Event callbacks
 
     def motion(self, event):
-        print("Motion", event.x, event.y)
+        logger.debug("Motion at {}, {}", event.x, event.y)
         self.hovered_token_mode = "cursor"
         self.start_highlight_timer()
         self.start_tooltip_timer()
 
     def insert_moved(self, *stuff):
-        print("Insert Moved", stuff)
+        logger.debug("Insert Moved {}", stuff)
         self.hovered_token_mode = "insert"
         self.highlight(force=True)
         self.nuke_tooltip()
@@ -783,23 +743,14 @@ class CodeEditor(tkinter.Frame):
             self.start_syntax_update_timer()
             self.update_sidebars()
         self.set_name()
-#        self.after(1, self.do_thing)
-#
-#    def do_thing(self):
-#        print("B")
-#        if self.text.edit_modified():
-#            self.text["background"] = "green"
-#        else:
-#            self.text["background"] = "white"
-#        print("A")
 
     def leave(self, event):
-        print("Leave", event.x, event.y, self)
+        logger.debug("Leave at {},{}", event.x, event.y)
         self.hovered_token_mode = "cursor"
         self.nuke_tooltip()
 
     def enter(self, event):
-        print("Enter", event.x, event.y, self)
+        logger.debug("Enter at {}, {}", event.x, event.y)
         self.hovered_token_mode = "cursor"
         self.start_tooltip_timer()
         self.start_highlight_timer()
@@ -823,25 +774,23 @@ class CodeEditor(tkinter.Frame):
         return name
 
     def set_name(self):
+        logger.debug("Setting name")
         if isinstance(self.master, ttk.Notebook):
-            print("SN go")
             if str(self) in self.master.tabs():
-                print("SN do")
                 self.master.tab(self, text=self.display_name)
             if hasattr(self.master.master, "on_tab_change"):
                 self.master.master.on_tab_change()
 
     def comment_line(self, *discard):
-        print("CL")
+        logger.info("Commentising line")
         current_line = self.text.index("insert").split(".")[0]
         self.text.insert("{}.0".format(current_line), "# ")
         return "break"
 
     def decomment_line(self, *discard):
-        print("DCL")
+        logger.info("Decommentising line")
         current_line = self.text.index("insert").split(".")[0]
         line = self.text.get("{}.0".format(current_line), "{}.end".format(current_line))
-        print(repr(line))
         for i, c in enumerate(line):
             if c == "#":
                 self.text.delete("{}.{}".format(current_line, i))
@@ -868,7 +817,7 @@ class CodeEditor(tkinter.Frame):
             spaces = 20 - charno
         else:
             spaces = 4
-        print("Indent by", spaces, "to", charno + spaces)
+        logger.info("Indenting line by {} to {}", spaces, charno + spaces)
         self.text.insert("insert", " " * spaces)
         return "break"
 
@@ -887,7 +836,7 @@ class CodeEditor(tkinter.Frame):
             spaces = charno - 8
         else:
             spaces = charno
-        print("Deindent from", charno, "by", spaces, "to", charno - spaces)
+        logger.info("Indenting line from {} by {} to {}", charno, spaces, charno - spaces)
         self.text.delete("insert-{}c".format(spaces), "insert")
         return "break"
 

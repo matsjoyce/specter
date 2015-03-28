@@ -3,12 +3,15 @@ from tkinter import (filedialog as fdialog, scrolledtext as stext,
                      simpledialog, font as tkfont, ttk)
 import math
 import functools
+import logging
 import runner
 import codeeditor
 import dbgcodeeditor
 
 
 STICKY_NESW = tkinter.NE + tkinter.SW
+
+logger = logging.getLogger(__name__)
 
 
 def check_num(num):
@@ -503,7 +506,7 @@ class RunMode(tkinter.Frame):
 
     @breakpoints_active.setter
     def breakpoints_active(self, value):
-        print("Breakpoints active:", value)
+        logger.info("Breakpoints active: {}", value)
         self._breakpoints_active = value
         self.breakpoints_active_var.set(value)
         self.runner.breakpoints_active = value

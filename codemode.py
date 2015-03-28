@@ -1,8 +1,11 @@
 import tkinter
 from tkinter import ttk, filedialog, simpledialog, font as tkfont, scrolledtext
+import logging
 
 import codeeditor
 import assembler
+
+logger = logging.getLogger(__name__)
 
 
 class AssembleDialog(simpledialog.Dialog):
@@ -126,7 +129,7 @@ class CodeMode(tkinter.Frame):
             return self.tabber.nametowidget(self.tabber.select())
 
     def open(self, fnames=None):
-        print("CM open")
+        logger.info("Open")
         if not fnames:
             fnames = filedialog.askopenfilenames(parent=self,
                                                  defaultextension=".lmc",
@@ -134,6 +137,7 @@ class CodeMode(tkinter.Frame):
                                                             ("All files", "*")])
         if not fnames:
             return
+        logger.info("Opening {}", fnames)
         for fname in fnames:
             current = [i for i in self.codeeditors if i.fname == fname]
             if current:
@@ -148,7 +152,7 @@ class CodeMode(tkinter.Frame):
                 self.tabber.select(ce)
 
     def new(self, *e):
-        print("CM new")
+        logger.info("New")
         ce = codeeditor.CodeEditor(self.tabber)
         self.codeeditors.append(ce)
         self.tabber.add(ce)
@@ -156,7 +160,7 @@ class CodeMode(tkinter.Frame):
         ce.set_name()
 
     def close_current(self, *e):
-        print("CM close")
+        logger.info("Close")
         if self.codeeditors:
             current_ce = self.current_codeeditor()
             if current_ce.close():
@@ -165,35 +169,35 @@ class CodeMode(tkinter.Frame):
                 current_ce.destroy()
 
     def save_current(self, *e):
-        print("CM save")
+        logger.info("Save")
         if self.codeeditors:
             return self.current_codeeditor().save()
         self.on_tab_change()
 
     def saveas_current(self, *e):
-        print("CM saveas")
+        logger.info("Save As")
         if self.codeeditors:
             return self.current_codeeditor().saveas()
         self.on_tab_change()
 
     def reload_current(self, *e):
-        print("CM save")
+        logger.info("Reload")
         if self.codeeditors:
             return self.current_codeeditor().reload()
 
     def assemble(self, *e):
-        print("CM assemble")
+        logger.info("Assemble")
         if self.codeeditors and AssembleDialog(self, self.current_codeeditor().assembler).result:
-            print("Switch")
+            logger.info("Switch")
             getattr(self.master, "runmode", lambda: None)()
 
     def commant_current(self, *e):
-        print("CM comment")
+        logger.info("Comment")
         if self.codeeditors:
             return self.current_codeeditor().comment_line()
 
     def commant_decurrent(self, *e):
-        print("CM decomment")
+        logger.info("Decomment")
         if self.codeeditors:
             return self.current_codeeditor().decomment_line()
 

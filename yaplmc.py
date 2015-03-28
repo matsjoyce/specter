@@ -17,14 +17,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import assembler
-import runner
-
 import tkinter
 from tkinter import (filedialog as fdialog, scrolledtext as stext,
                      simpledialog, font as tkfont)
+import logging
+import sys
+
+import assembler
+import runner
 import codemode
 import runmode
+import colored_logger
 
 __author__ = "Matthew Joyce"
 __copyright__ = "Copyright 2013"
@@ -34,6 +37,9 @@ __version__ = "1.1.0"
 __maintainer__ = "Matthew Joyce"
 __email__ = "matsjoyce@gmail.com"
 __status__ = "Development"
+
+logger = logging.getLogger()
+logger.name = __name__
 
 
 class GUIManager(tkinter.Tk):
@@ -174,17 +180,31 @@ under certain conditions. Type `yaplmc --licence` for details.
     if args_from_parser.licence:
         print(__doc__.strip())
 
+    logger.setLevel(logging.DEBUG)
+
+    log_formatter = colored_logger.ColoredFormatter()
+
+    stream_hndlr = logging.StreamHandler(sys.stdout)
+    stream_hndlr.setFormatter(log_formatter)
+    stream_hndlr.setLevel(logging.CRITICAL if args_from_parser.cli else logging.INFO)
+    logger.addHandler(stream_hndlr)
+
     if args_from_parser.buginfo:
         import inquisitor
         exc_catcher = inquisitor.Inquisitor()
+        log_col = inquisitor.collectors.LoggingCollector()
+        log_col.setFormatter(log_formatter)
+        exc_catcher.collectors.append(log_col)
+        logger.addHandler(log_col)
         rh = inquisitor.utils.ReportManager("bug_info", "bug_info_{no}.xml",
                                             max_files_size=inquisitor.utils.MiB)
         xml_h = inquisitor.handlers.XMLFileDumpHandler(reportmanager=rh)
-        exc_catcher.handlers.append(xml_h)
+        log_h = inquisitor.handlers.LogTracebackHandler()
+        exc_catcher.handlers = [xml_h, log_h]
         exc_catcher.watch_sys_excepthook()
         exc_catcher.watch_tkinter_report_callback_exception()
         if args_from_parser.cli:
-            tk_h = inquisitor.handlers.TkinterMessageHandler()
+            tk_h = inquisitor.handlers.StreamMessageHandler()
             exc_catcher.handlers.append(tk_h)
         else:
             tk_h = inquisitor.handlers.TkinterMessageHandler()
