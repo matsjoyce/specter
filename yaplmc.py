@@ -43,7 +43,7 @@ logger.name = __name__
 
 
 class GUIManager(tkinter.Tk):
-    def __init__(self):
+    def __init__(self, exc_reporter):
         super().__init__()
         self.title("yaplmc")
         self.columnconfigure(0, weight=1)
@@ -51,6 +51,17 @@ class GUIManager(tkinter.Tk):
 
         self.menu = tkinter.Menu(self)
         self["menu"] = self.menu
+
+        self.settings_menu = tkinter.Menu(self.menu, tearoff=False)
+        self.exc_reporter = exc_reporter
+        self.exc_reporting_var = tkinter.BooleanVar()
+        self.exc_reporting_var.set(exc_reporter.enabled
+                                   if exc_reporter else False)
+        er_state = "disabled" if exc_reporter is None else "active"
+        self.settings_menu.add_checkbutton(label="Exception reporting",
+                                           variable=self.exc_reporting_var,
+                                           command=self.update_exc_reporting,
+                                           state=er_state)
 
         self.code_mode = codemode.CodeMode(self)
         self.run_mode = runmode.RunMode(self)
@@ -64,6 +75,7 @@ class GUIManager(tkinter.Tk):
         end = self.menu.index(tkinter.END)
         for opts in menus:
             self.menu.add_cascade(**opts)
+        self.menu.add_cascade(label="Settings", menu=self.settings_menu)
         self.menu.delete(0, end)
 
     def runmode(self, *discard):
@@ -95,14 +107,17 @@ class GUIManager(tkinter.Tk):
     def set_title(self, txt):
         self.title("yaplmc - " + txt)
 
+    def update_exc_reporting(self):
+        self.exc_reporter.enabled = self.exc_reporting_var.get()
 
-def main_gui(args_from_parser):
-    t = GUIManager()
+
+def main_gui(args_from_parser, exc_reporter):
+    t = GUIManager(exc_reporter)
     t.mainloop()
     return 0
 
 
-def main_cli(args_from_parser):
+def main_cli(args_from_parser, exc_reporter):
     try:
         with open(args_from_parser.file or input("Filename: ")) as f:
             code = f.read()
@@ -137,11 +152,13 @@ def main_cli(args_from_parser):
             run.next_step()
         except RuntimeError as e:
             print("Error", e.args[0])
+        except (KeyboardInterrupt, EOFError):
+            break
         if run.halt_reason == runner.HaltReason.input:
-            #try:
+            try:
                 run.give_input(int(input("<<< ")))
-            #except (KeyboardInterrupt, EOFError):
-                #break
+            except (KeyboardInterrupt, EOFError):
+                break
         if args_from_parser.debug >= 1:
             print(run.hint)
     return 0
@@ -189,8 +206,17 @@ under certain conditions. Type `yaplmc --licence` for details.
     stream_hndlr.setLevel(logging.CRITICAL if args_from_parser.cli else logging.INFO)
     logger.addHandler(stream_hndlr)
 
-    if args_from_parser.buginfo:
+    try:
         import inquisitor
+    except:
+        exc_catcher = None
+        if args_from_parser.buginfo:
+            print("Could not import inquisitor. Please make sure"
+                  " it has been installed to the correct Python environment.")
+            exit(1)
+        else:
+            logger.info("Could not import inquisitor, disabling exception reporting")
+    else:
         exc_catcher = inquisitor.Inquisitor()
         log_col = inquisitor.collectors.LoggingCollector()
         log_col.setFormatter(log_formatter)
@@ -209,8 +235,9 @@ under certain conditions. Type `yaplmc --licence` for details.
         else:
             tk_h = inquisitor.handlers.TkinterMessageHandler()
             exc_catcher.handlers.append(tk_h)
+        exc_catcher.enabled = args_from_parser.buginfo
 
     if args_from_parser.cli:
-        exit(main_cli(args_from_parser))
+        exit(main_cli(args_from_parser, exc_catcher))
     else:
-        exit(main_gui(args_from_parser))
+        exit(main_gui(args_from_parser, exc_catcher))
