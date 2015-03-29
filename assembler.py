@@ -400,6 +400,7 @@ class Assembler:
         self.parsed = True
         return self.parsed_code
 
+    @property
     def problems(self):
         return sum((token.problems for token in self.tokens), [])
 
@@ -478,4 +479,4 @@ if __name__ == "__main__":
 
     print("=" * 25, "Problems", "=" * 25)
 
-    print(*[i.show(code.splitlines()) for i in a.problems()])
+    print(*[i.show(code.splitlines()) for i in a.problems])

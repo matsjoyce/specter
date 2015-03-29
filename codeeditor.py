@@ -1,5 +1,5 @@
 import tkinter
-from tkinter import scrolledtext as stext, font as tkfont, filedialog, ttk, messagebox
+from tkinter import scrolledtext as stext, font as tkfont, filedialog, ttk, messagebox, simpledialog
 import functools
 import collections
 import assembler
@@ -51,10 +51,72 @@ def grouper(iterable, n, fillvalue=None):
     return itertools.zip_longest(*args, fillvalue=fillvalue)
 
 
-
 def mouse_inside(widget):
     return (0 <= (widget.winfo_pointerx() - widget.winfo_rootx()) < widget.winfo_width()
             and 0 <= (widget.winfo_pointery() - widget.winfo_rooty()) < widget.winfo_height())
+
+
+class ProblemsDialog(simpledialog.Dialog):
+    def __init__(self, master, assembler):
+        self.assembler = assembler
+        super().__init__(master)
+
+    def body(self, master):
+        master.pack = lambda *a, p=master.pack, **k: p(*a, fill="both",
+                                                       expand=1, **k)
+        self.title("Problems")
+        self.assembler.assemble()
+        columns = ["Type", "Problem", "Line", "Text"]
+
+        self.tree = ttk.Treeview(master, columns=columns, show="headings")
+
+        normal_font = tkfont.Font(self.tree, "TkFixedFont")
+
+        bold_font = tkfont.Font(self.tree, normal_font)
+        bold_font["weight"] = "bold"
+
+        self.tree.tag_configure("error", foreground=ERROR_COLOR,
+                                font=bold_font)
+        self.tree.tag_configure("warning", foreground=WARNING_COLOR,
+                                font=normal_font)
+
+        widths = {col: [] for col in columns}
+        self.item_to_token = {}
+
+        for col in columns:
+            self.tree.heading(col, text=col)
+            widths[col].append(tkfont.Font().measure(col))
+        for token in self.assembler.tokens:
+            for problem in token.problems:
+                item = self.tree.insert("", tkinter.END)
+                values = (problem.name, problem.msg, problem.position.lineno,
+                          problem.position.get_line(self.assembler.code))
+                self.item_to_token[item] = token
+                self.tree.item(item, values=values, tags=problem.cat)
+                for col, v in zip(columns, values):
+                    widths[col].append(bold_font.measure(v) + 15)
+
+        for col, width in widths.items():
+            self.tree.column(col, width=max(width))
+
+        self.tree.bind("<Double-Button-1>", self.double_click)
+
+        self.tree.pack(fill="both", expand=1)
+
+    def buttonbox(self):
+        button_frame = tkinter.Frame(self)
+        b = tkinter.Button(button_frame, text="Back to code", command=self.cancel)
+        b.pack()
+        button_frame.pack()
+
+        self.bind("<Return>", self.cancel)
+        self.bind("<Escape>", self.cancel)
+        return button_frame
+
+    def double_click(self, *discard):
+        token = self.item_to_token[self.tree.focus()]
+        self.master.goto_token(token)
+        self.cancel()
 
 
 class TooltipContentInterface:
@@ -846,6 +908,9 @@ class CodeEditor(tkinter.Frame):
         else:
             self.text.tag_configure("breakpoint", background="white")
 
+    def show_problems(self):
+        ProblemsDialog(self, self.assembler)
+
 if __name__ == "__main__":
     import sys
     import tkinter.ttk as ttk
@@ -858,4 +923,5 @@ if __name__ == "__main__":
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)
     ce.open()
+    ProblemsDialog(ce, ce.assembler)
     root.mainloop()

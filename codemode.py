@@ -8,14 +8,12 @@ import assembler
 logger = logging.getLogger(__name__)
 
 
-class AssembleDialog(simpledialog.Dialog):
-    def __init__(self, master, assembler_: assembler.Assembler):
-        self.assembler = assembler_
+class AssembleDialog(codeeditor.ProblemsDialog):
+    def __init__(self, master, assembler):
         self.result = False
-        super().__init__(master)
+        super().__init__(master, assembler)
 
-    def body(self, root):
-        self.title("Assembling")
+    def body(self, master):
         self.assembler.assemble()
 
         if not self.assembler.in_error:
@@ -31,21 +29,8 @@ class AssembleDialog(simpledialog.Dialog):
 
         tkinter.Label(self, text="Problems:").pack()
 
-        t = scrolledtext.ScrolledText(self, bg="white")
-        bold_font = tkfont.Font(t, t.cget("font"))
-        bold_font["weight"] = "bold"
-        t.tag_config("error", font=bold_font, foreground=codeeditor.ERROR_COLOR)
-        t.tag_config("warning", font=bold_font, foreground=codeeditor.WARNING_COLOR)
-
-        for prob in self.assembler.problems():
-            t.insert(tkinter.END, prob.show(self.assembler.code) + "\n\n", prob.cat)
-
-        t.pack()
-        t["state"] = "disabled"
-
-    def cancel_(self, *args):
-        self.result = False
-        super().cancel(*args)
+        super().body(master)
+        self.title("Assembling")
 
     def ok(self, *args):
         self.result = True
@@ -57,11 +42,11 @@ class AssembleDialog(simpledialog.Dialog):
         if not self.assembler.in_error:
             b = tkinter.Button(box, text="Run", command=self.ok)
             b.pack(side=tkinter.LEFT)
-        b = tkinter.Button(box, text="Back to code", command=self.cancel_)
+        b = tkinter.Button(box, text="Back to code", command=self.cancel)
         b.pack(side=tkinter.LEFT)
 
-        self.bind("<Return>", self.ok if not self.assembler.in_error else self.cancel_)
-        self.bind("<Escape>", self.cancel_)
+        self.bind("<Return>", self.ok if not self.assembler.in_error else self.cancel)
+        self.bind("<Escape>", self.cancel)
         box.pack()
 
 
@@ -84,6 +69,7 @@ class CodeMode(tkinter.Frame):
 
         self.code_menu = tkinter.Menu(self.master.menu, tearoff=False)
         self.code_menu.add_command(label="Assemble", command=self.assemble)
+        self.code_menu.add_command(label="Problems", command=self.problems)
         self.code_menu.add_separator()
         self.code_menu.add_command(label="Comment", command=self.commant_current)
         self.code_menu.add_command(label="Decomment", command=self.commant_decurrent)
@@ -187,9 +173,13 @@ class CodeMode(tkinter.Frame):
 
     def assemble(self, *e):
         logger.info("Assemble")
-        if self.codeeditors and AssembleDialog(self, self.current_codeeditor().assembler).result:
-            logger.info("Switch")
-            getattr(self.master, "runmode", lambda: None)()
+        if self.codeeditors:
+            ce = self.current_codeeditor()
+            if AssembleDialog(ce, ce.assembler).result:
+                logger.info("Switch")
+                getattr(self.master, "runmode", lambda: None)()
+            else:
+                logger.info("No switch")
 
     def commant_current(self, *e):
         logger.info("Comment")
@@ -201,18 +191,27 @@ class CodeMode(tkinter.Frame):
         if self.codeeditors:
             return self.current_codeeditor().decomment_line()
 
+    def problems(self, *e):
+        logger.info("Problems")
+        if self.codeeditors:
+            return self.current_codeeditor().show_problems()
+
     def on_tab_change(self, *e):
         if self.codeeditors:
             self.master.set_title(self.current_codeeditor().display_name)
 
 if __name__ == "__main__":
     root = tkinter.Tk(className='ToolTip-demo')
+    root.menu = tkinter.Menu(root)
+    root.set_title = lambda *a: None
     t = CodeMode(root)
     t.grid(row=0, column=0, sticky=tkinter.NE + tkinter.SW)
 
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)
-    root["menu"] = t.menu
+    root["menu"] = root.menu
+    for opts in t.menus:
+        root.menu.add_cascade(**opts)
     t.open()
     t.focus_set()
     t.do_bindings()

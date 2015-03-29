@@ -113,8 +113,8 @@ def main_cli(args_from_parser):
     assem = assembler.Assembler()
     assem.update_code(code)
     assem.assemble()
-    if assem.problems():
-        print("\n".join(i.show(code.splitlines()) for i in assem.problems()))
+    if assem.problems:
+        print("\n".join(i.show(code.splitlines()) for i in assem.problems))
     if assem.in_error:
         print("Assembly failed")
         return 1
