@@ -68,7 +68,9 @@ class ProblemsDialog(simpledialog.Dialog):
         self.assembler.assemble()
         columns = ["Type", "Problem", "Line", "Text"]
 
-        self.tree = ttk.Treeview(master, columns=columns, show="headings")
+        self.treeframe = tkinter.Frame(master)
+
+        self.tree = ttk.Treeview(self.treeframe, columns=columns, show="headings")
 
         normal_font = tkfont.Font(self.tree, "TkFixedFont")
 
@@ -97,11 +99,21 @@ class ProblemsDialog(simpledialog.Dialog):
                     widths[col].append(bold_font.measure(v) + 15)
 
         for col, width in widths.items():
-            self.tree.column(col, width=max(width))
+            self.tree.column(col, minwidth=max(width))
 
         self.tree.bind("<Double-Button-1>", self.double_click)
+        self.tree.grid(row=0, column=0, sticky=tkinter.NE + tkinter.SW)
 
-        self.tree.pack(fill="both", expand=1)
+        self.xtreescroll = tkinter.Scrollbar(self.treeframe, orient=tkinter.HORIZONTAL, command=self.tree.xview)
+        self.tree["xscrollcommand"] = self.xtreescroll.set
+        self.xtreescroll.grid(row=1, column=0, sticky=tkinter.E + tkinter.W)
+        self.ytreescroll = tkinter.Scrollbar(self.treeframe, command=self.tree.yview)
+        self.tree["yscrollcommand"] = self.ytreescroll.set
+        self.ytreescroll.grid(row=0, column=1, sticky=tkinter.N + tkinter.S)
+
+        self.treeframe.pack(fill="both", expand=1)
+        self.treeframe.rowconfigure(0, weight=1)
+        self.treeframe.columnconfigure(0, weight=1)
 
     def buttonbox(self):
         button_frame = tkinter.Frame(self)
