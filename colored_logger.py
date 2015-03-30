@@ -55,7 +55,7 @@ class ColoredFormatter(logging.Formatter):
             yield ""
             yield colorise("The above exception was the direct cause of the following exception:", YELLOW)
             yield ""
-        elif exc.__context__:
+        if exc.__context__ and not exc.__suppress_context__:
             yield from self.format_traceback(exc.__context__)
             yield ""
             yield colorise("During handling of the above exception, another exception occurred:", YELLOW)
