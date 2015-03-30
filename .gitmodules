@@ -1,0 +1,3 @@
+[submodule "deps/inquisitor"]
+	path = deps/inquisitor
+	url = https://github.com/matsjoyce/inquisitor.git
