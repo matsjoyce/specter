@@ -1,54 +1,17 @@
-#!/usr/bin/env python3
-"""
-Graphical user interface written with tkinter for yaplmc
-Copyright (C) 2013  Matthew Joyce matsjoyce@gmail.com
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
-
-__author__ = "Matthew Joyce"
-__copyright__ = "Copyright 2013"
-__credits__ = ["Matthew Joyce"]
-__license__ = "GPL3"
-__version__ = "1.1.0"
-__maintainer__ = "Matthew Joyce"
-__email__ = "matsjoyce@gmail.com"
-__status__ = "Development"
-
 import tkinter
 from tkinter import (filedialog as fdialog, scrolledtext as stext,
-                     simpledialog, font as tkfont)
-import yaplmc
+                     simpledialog, font as tkfont, ttk)
 import math
-from functools import partial
+import functools
+import logging
+import runner
+import codeeditor
+import dbgcodeeditor
 
-CHANGEDN = "#C00"
-CHANGED = "#E00"
-
-READN = "#CC0"
-READ = "#EE0"
-
-INTRN = "#080"
-INTR = "#0A0"
-
-NINTRN = "#AAA"
-NINTR = "#CCC"
-
-DEFAULTN = "#DDD"
-DEFAULT = "#FFF"
 
 STICKY_NESW = tkinter.NE + tkinter.SW
+
+logger = logging.getLogger(__name__)
 
 
 def check_num(num):
@@ -65,8 +28,6 @@ def check_num(num):
 class MemoryDisplay(tkinter.Frame):
     def __init__(self, root, setmem, updater, rows=5):
         super().__init__(root)
-        tkinter.Label(self, text="Memory").grid(row=0, column=1,
-                                                columnspan=rows * 2)
         self.setmem = setmem
         self.rows = rows
         self.per_thing = 100 // rows
@@ -76,17 +37,19 @@ class MemoryDisplay(tkinter.Frame):
         self.updater = updater
         for i in range(100):
             col = int(math.floor(i / self.per_thing))
-            row = i % self.per_thing + 1
+            row = i % self.per_thing
 
-            mn = tkinter.Entry(self, width=2, bg=DEFAULT, borderwidth=0)
+            mn = tkinter.Entry(self, width=2, bg="white", borderwidth=0,
+                               selectbackground="white", selectforeground="black")
             mn.grid(row=row, column=col * 2, sticky=STICKY_NESW)
             mn.insert(0, str(i).zfill(2))
             self.memory_nums.append(mn)
             mn["state"] = "readonly"
 
             var = tkinter.StringVar(value="000")
-            vcmd = self.register(partial(self.changed, i)), "%P", "%V"
-            m = tkinter.Entry(self, width=3, bg=DEFAULT, borderwidth=0,
+            vcmd = (self.register(functools.partial(self.changed, i)), "%P",
+                    "%V")
+            m = tkinter.Entry(self, width=3, bg="white", borderwidth=0,
                               textvariable=var, vcmd=vcmd, validate="all")
             m.grid(row=row, column=col * 2 + 1, sticky=STICKY_NESW)
             self.memorys.append(m)
@@ -107,138 +70,63 @@ class MemoryDisplay(tkinter.Frame):
             self.after(0, self.updater)
         return True
 
-    def update_memory(self, mem):
-        for i, m in enumerate(mem):
-            self.mem_vars[i].set(str(m).zfill(3))
+    def update_memory(self, runner):
+        for i, m in enumerate(runner.memory):
+            self.mem_vars[i].set(str(m.value).zfill(3))
 
-    def set_colors(self, mem_changed, mem_read, instr, ninstr):
-        for i in range(100):
-            self.memory_nums[i]["readonlybackground"] = DEFAULTN
-            self.memorys[i]["bg"] = DEFAULT
-        for i in mem_read:
-            self.memory_nums[i]["readonlybackground"] = READN
-            self.memorys[i]["bg"] = READ
-        for i in mem_changed:
-            self.memory_nums[i]["readonlybackground"] = CHANGEDN
-            self.memorys[i]["bg"] = CHANGED
-        self.memory_nums[instr]["readonlybackground"] = INTRN
-        self.memorys[instr]["bg"] = INTR
-        self.memory_nums[ninstr]["readonlybackground"] = NINTRN
-        self.memorys[ninstr]["bg"] = NINTR
+    def set_colors(self, runner_):
+        for i, m in enumerate(runner_.memory):
+            self.memory_nums[i]["readonlybackground"] = dbgcodeeditor.darken(dbgcodeeditor.COLOR_MAP[m.state])
+            self.memorys[i]["bg"] = dbgcodeeditor.COLOR_MAP[m.state]
+            if (runner_.breakpoints_active
+               and m.state == runner.ValueState.normal
+               and m.breakpoint != runner.BreakpointState.off):
+                self.memory_nums[i]["readonlybackground"] = dbgcodeeditor.darken(codeeditor.BREAKPOINT_BG_COLOR)
+                self.memorys[i]["bg"] = codeeditor.BREAKPOINT_BG_COLOR
 
 
-class AssembleGUI(simpledialog.Dialog):
-    def __init__(self, f=None, parent=None):
-        self.f = f
-        self.code = self.fname = None
-        super().__init__(parent)
-
-    def get_file(self):
-        l = tkinter.Label(self.root, text="Waiting for file...",
-                          padx=10, pady=10)
-        l.pack()
-        f = fdialog.askopenfile()
-
-        l.destroy()
-        return f
-
-    def body(self, root):
-        self.root = root
-        self.title("yaplmc")
-
-        if self.f is None:
-            f = self.get_file()
-        else:
-            f = open(self.f)
-        if f is None:
-            exit(0)
-
-        self.fname = f.name
-        self.title("yaplmc - " + self.fname)
-
-        code = f.read().split("\n")
-
-        try:
-            self.code, code_length = yaplmc.assemble(code)
-        except SyntaxError as e:
-            self.code = None
-            tkinter.Label(self.root, text="Assembly failed!\nError:").pack()
-
-            t = tkinter.Text(self.root, bg="white")
-            t.insert(tkinter.END, e.args[0])
-
-            bold_font = tkfont.Font(t, t.cget("font"))
-            bold_font["weight"] = "bold"
-            t.config(font=bold_font, foreground="red")
-            t.pack()
-            t["state"] = "disabled"
-        else:
-            tkinter.Label(self.root, text="Assembly succeeded!\nCode:").pack()
-
-            t = tkinter.Text(self.root, bg="white")
-            code = " ".join(str(i).zfill(3) for i in self.code[:code_length])
-            t.insert(tkinter.END, code)
-            t.pack()
-            t["state"] = "disabled"
-
-    def cancel_(self, *args):
-        self.code = self.fname = None
-        super().cancel(*args)
-
-    def buttonbox(self):
-        box = tkinter.Frame(self)
-
-        if self.code:
-            b = tkinter.Button(box, text="Run", command=self.ok)
-            b.pack(side=tkinter.LEFT)
-        b = tkinter.Button(box, text="Exit", command=self.cancel_)
-        b.pack(side=tkinter.LEFT)
-
-        self.bind("<Return>", self.ok if self.code else self.cancel_)
-        self.bind("<Escape>", self.cancel_)
-        box.pack()
-
-
-class RunGUI:
-    def __init__(self):
-        self.root = tkinter.Tk()
-        self.root.title("yaplmc")
+class RunMode(tkinter.Frame):
+    def __init__(self, master):
+        super().__init__(master)
 
         self.getting_inp = False
         self.run_to_halt = False
         self.show_debug = 0
         self.all_output = []
+        self.runner = runner.Runner(self.give_output)
 
         # Top row of buttons
 
-        self.button_frame = tkinter.Frame(self.root)
+        self.button_frame = tkinter.Frame(self)
         self.button_frame.grid(row=0, column=0, columnspan=2,
                                sticky=tkinter.E + tkinter.W + tkinter.N)
 
         self.run_to_hlt_btn = tkinter.Button(self.button_frame,
-                                             text="Run to halt",
+                                             text="Run",
                                              command=self.run_to_hlt)
         self.run_to_hlt_btn.grid(row=0, column=0, sticky=tkinter.E + tkinter.W,
                                  padx=2, pady=2)
 
         self.run_step_btn = tkinter.Button(self.button_frame,
-                                           text="Run one step",
+                                           text="Step",
                                            command=self.next_step)
         self.run_step_btn.grid(row=0, column=1, sticky=tkinter.E + tkinter.W,
                                padx=2, pady=2)
 
-        self.pause_btn = tkinter.Button(self.button_frame, text="Pause",
-                                        command=self.pause)
-        self.pause_btn.grid(row=0, column=2, sticky=tkinter.E + tkinter.W,
-                            padx=2, pady=2)
-
         self.reset_btn = tkinter.Button(self.button_frame, text="Reset",
                                         command=self.reset)
-        self.reset_btn.grid(row=0, column=3, sticky=tkinter.E + tkinter.W,
+        self.reset_btn.grid(row=0, column=2, sticky=tkinter.E + tkinter.W,
                             padx=2, pady=2)
 
-        self.exit_btn = tkinter.Button(self.button_frame, text="Exit",
-                                       command=self.exit)
+        self.debug_var = tkinter.BooleanVar(value=False)
+        self.debug_btn = tkinter.Button(self.button_frame,
+                                        command=self.toggle_debug, text="Debug")
+        self.debug_btn.grid(row=0, column=3, sticky=tkinter.E + tkinter.W,
+                            padx=2, pady=2)
+
+        switch_cmd = getattr(self.master, "codemode", lambda: None)
+        self.exit_btn = tkinter.Button(self.button_frame, text="Back to code",
+                                       command=switch_cmd)
         self.exit_btn.grid(row=0, column=4, sticky=tkinter.E + tkinter.W,
                            padx=2, pady=2)
 
@@ -248,7 +136,7 @@ class RunGUI:
 
         # Left row of inputs
 
-        self.control_frame = tkinter.Frame(self.root)
+        self.control_frame = tkinter.Frame(self)
         self.control_frame.grid(row=1, column=0,
                                 sticky=tkinter.NE + tkinter.SW,
                                 padx=5, pady=5)
@@ -258,9 +146,9 @@ class RunGUI:
                                                 sticky=tkinter.W)
 
         self.accumulator_var = tkinter.StringVar(value="000")
-        vcmd = self.root.register(self.accumulator_changed), "%P", "%V"
+        vcmd = self.register(self.accumulator_changed), "%P", "%V"
         self.accumulator = mn = tkinter.Entry(self.control_frame, width=5,
-                                              bg=DEFAULT, borderwidth=0,
+                                              bg="white", borderwidth=0,
                                               textvar=self.accumulator_var,
                                               vcmd=vcmd, validate="all")
         self.accumulator.grid(row=0, column=1, sticky=tkinter.W,
@@ -270,9 +158,9 @@ class RunGUI:
                       text="Counter:").grid(row=1, column=0, sticky=tkinter.W)
 
         self.counter_var = tkinter.StringVar(value="000")
-        vcmd = self.root.register(self.counter_changed), "%P", "%V"
+        vcmd = self.register(self.counter_changed), "%P", "%V"
         self.counter = tkinter.Entry(self.control_frame, width=5,
-                                     bg=DEFAULT, borderwidth=0,
+                                     bg="white", borderwidth=0,
                                      textvar=self.counter_var,
                                      vcmd=vcmd, validate="all")
         self.counter.grid(row=1, column=1, sticky=tkinter.W, padx=10, pady=5)
@@ -282,7 +170,7 @@ class RunGUI:
 
         self.input_frame = tkinter.Frame(self.control_frame)
         self.input_var = tkinter.StringVar()
-        vcmd = self.root.register(self.check_input), "%P"
+        vcmd = self.register(self.check_input), "%P"
         self.input = tkinter.Entry(self.input_frame, width=5,
                                    textvariable=self.input_var,
                                    state="disabled",
@@ -320,17 +208,19 @@ class RunGUI:
         self.output.tag_configure("done", font=normal_font)
 
         self.output.tag_configure("debug_write", font=italic_font,
-                                  foreground=CHANGEDN)
+                                  foreground=dbgcodeeditor.darken(dbgcodeeditor.WRITTEN_COLOR))
         self.output.tag_configure("debug_read", font=italic_font,
-                                  foreground=READN)
+                                  foreground=dbgcodeeditor.darken(dbgcodeeditor.READ_COLOR))
         self.output.tag_configure("debug_jump", font=italic_font,
-                                  foreground=NINTRN)
+                                  foreground=dbgcodeeditor.darken(dbgcodeeditor.NEXT_EXEC_COLOR))
         self.output.tag_configure("debug_other", font=italic_font,
-                                  foreground=INTRN)
+                                  foreground=dbgcodeeditor.darken(dbgcodeeditor.EXECUTED_COLOR))
 
         self.output.tag_configure("debug_output", font=bold_font)
         self.output.tag_configure("debug_input", font=bold_font)
         self.output.tag_configure("debug_error", font=bold_font,
+                                  foreground="red")
+        self.output.tag_configure("debug_breakpoint", font=bold_font,
                                   foreground="red")
         self.output.tag_configure("debug_done", font=bold_font)
 
@@ -347,50 +237,71 @@ class RunGUI:
         self.speed_scale.grid(row=4, column=1,
                               sticky=tkinter.E + tkinter.W, padx=10)
 
-        tkinter.Label(self.control_frame, text="Debug:").grid(row=5,
-                                                              column=0,
-                                                              sticky=tkinter.W)
-
-        self.debug_var = tkinter.BooleanVar(value=False)
-        vcmd = self.root.register(self.counter_changed), "%P", "%V"
-        self.debug_btn = tkinter.Button(self.control_frame,
-                                        command=self.toggle_debug, text="Off")
-        self.debug_btn.grid(row=5, column=1, sticky=tkinter.W, padx=10, pady=5)
-
         self.control_frame.columnconfigure(1, weight=1)
         self.control_frame.rowconfigure(3, weight=1)
 
-        # Memory display on right
+        # Tabber for switching between memory and code
 
-        self.memory_frame = MemoryDisplay(self.root, self.setmem,
+        self.tabber = ttk.Notebook(self)
+        self.tabber.grid(row=1, column=1, sticky=STICKY_NESW, padx=5, pady=5)
+        self.tabber.bind("<<NotebookTabChanged>>", self.unfocus_tabber_widget)
+
+        # Memory display in the tabber
+
+        self.memory_frame = MemoryDisplay(self.tabber, self.setmem,
                                           self.update_memory)
-        self.memory_frame.grid(row=1, column=1, sticky=STICKY_NESW,
-                               padx=5, pady=5)
+        self.tabber.add(self.memory_frame, text="Memory", sticky=STICKY_NESW)
+
+        # Code display in the tabber
+
+        self.code_editor = dbgcodeeditor.DebugCodeEditor(self.tabber)
+        self.tabber.add(self.code_editor, text="Code", sticky=STICKY_NESW)
 
         # Make resizeable
 
-        self.root.columnconfigure(1, weight=2)
-        self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(1, weight=1)
+        self.columnconfigure(1, weight=3)
+        self.columnconfigure(0, weight=2)
+        self.rowconfigure(1, weight=1)
 
-        self.root.after(1, self.run_halt_check)  # Kick off
+        self.after(1, self.run_halt_check)  # Kick off
 
-    def set_code(self, code, fname):
-        self.runner = yaplmc.Runner(code, give_output=self.give_output,
-                                    halt_for_inp=True,
-                                    unfiltered_debug_output=self.give_debug)
-        self.root.title("yaplmc - " + fname)
+        self.menus = []
+        self.run_menu = tkinter.Menu(self.master.menu, tearoff=False)
+        self.run_menu.add_command(label="Run", command=self.run_to_halt)
+        self.run_menu.add_command(label="Step", command=self.next_step)
+        self.run_menu.add_command(label="Reset", command=self.reset)
+        self.menus.append(dict(label="Run", menu=self.run_menu))
+
+        self.debug_trace_var = tkinter.BooleanVar()
+        self.breakpoints_active_var = tkinter.BooleanVar()
+
+        self.debug_menu = tkinter.Menu(self.master.menu, tearoff=False)
+        self.debug_menu.add_checkbutton(label="Debug trace", variable=self.debug_trace_var,
+                                        command=self.update_debug_from_vars)
+        self.debug_menu.add_checkbutton(label="Breapoints", variable=self.breakpoints_active_var,
+                                        command=self.update_debug_from_vars)
+        self.menus.append(dict(label="Debug", menu=self.debug_menu))
+
+        self.breakpoints_active = False
+
+    def unfocus_tabber_widget(self, *e):
+        self.memory_frame.memory_nums[0].selection_clear()
+
+    def set_code(self, assembler, fname):
+        self.runner.load_code(assembler)
+        self.code_editor.update_runner(self.runner)
         self.update_memory()
+        self.code_editor.update_syntax()
 
     def accumulator_changed(self, num, reason):
         if reason == "key":
             ok, num = check_num(num)
             if not hasattr(self, "runner") or not ok:
                 return False
-            self.runner.setaccum(num)
+            self.runner.accumulator.write(num)
             self.set_colors()
         elif reason == "focusout":
-            self.root.after(0, self.update_memory)
+            self.after(0, self.update_memory)
         return True
 
     def counter_changed(self, num, reason):
@@ -407,7 +318,7 @@ class RunGUI:
             self.runner.counter = int(num)
             self.set_colors()
         elif reason == "focusout":
-            self.root.after(0, self.update_memory)
+            self.after(0, self.update_memory)
         return True
 
     def next_step(self):
@@ -420,12 +331,15 @@ class RunGUI:
             self.give_output(e.args[0], type="error")
             self.run_to_halt = False
             ret = None
-        self.type_debug()
+        self.give_debug()
         self.update_memory()
         self.update_output()
-        if ret == yaplmc.HALT_REASON_HLT:
+        if ret is runner.HaltReason.hlt:
             self.run_to_halt = False
-        elif ret == yaplmc.HALT_REASON_INP:
+        elif ret is runner.HaltReason.breakpoint:
+            self.run_to_halt = False
+            self.give_output("Hit breakpoint at {:03}".format(self.runner.instruction_addr), type="debug_breakpoint")
+        elif ret == runner.HaltReason.input:
             self.get_input()
         return ret
 
@@ -433,7 +347,21 @@ class RunGUI:
         if self.run_to_halt:
             self.next_step()
         i = int(self.speed_scale.get() * 1000)
-        self.root.after(i, self.run_halt_check)
+        self.after(i, self.run_halt_check)
+
+    @property
+    def run_to_halt(self):
+        return self._run_to_halt
+
+    @run_to_halt.setter
+    def run_to_halt(self, value):
+        self._run_to_halt = value
+        if not hasattr(self, "run_to_hlt_btn"):
+            return
+        if value:
+            self.run_to_hlt_btn.config(text="Stop", command=self.pause)
+        else:
+            self.run_to_hlt_btn.config(text="Run ", command=self.run_to_hlt)
 
     def run_to_hlt(self):
         self.run_to_halt = True
@@ -442,30 +370,30 @@ class RunGUI:
         self.run_to_halt = False
 
     def set_colors(self):
-        if self.runner.accumulator_changed:
-            self.accumulator.config(bg=CHANGED)
-        elif self.runner.accumulator_read:
-            self.accumulator.config(bg=READ)
-        else:
-            self.accumulator.config(bg=DEFAULT)
-        self.memory_frame.set_colors(self.runner.memory_changed,
-                                     self.runner.memory_read,
-                                     self.runner.instruction_addr,
-                                     self.runner.counter)
+        self.accumulator.config(bg=dbgcodeeditor.COLOR_MAP[self.runner.accumulator.state])
+        self.memory_frame.set_colors(self.runner)
+        self.code_editor.update_syntax()
 
     def update_memory(self):
-        self.memory_frame.update_memory(self.runner.memory)
-        self.accumulator_var.set(str(self.runner.accumulator).zfill(3))
+        self.memory_frame.update_memory(self.runner)
+        self.accumulator_var.set(str(self.runner.accumulator.value).zfill(3))
         self.counter_var.set(str(self.runner.counter).zfill(3))
         self.set_colors()
 
     def toggle_debug(self):
-        self.show_debug = not self.show_debug
-        if self.show_debug:
-            self.debug_btn.config(relief="sunken", text="On")
+        if self.show_debug or self.breakpoints_active:
+            self.show_debug = self.breakpoints_active = False
         else:
-            self.debug_btn.config(relief="raised", text="Off")
+            self.show_debug = self.breakpoints_active = True
         self.update_output()
+        self.update_debug_button()
+        self.debug_trace_var.set(self.show_debug)
+
+    def update_debug_button(self):
+        if self.show_debug or self.breakpoints_active:
+            self.debug_btn.config(relief="sunken")
+        else:
+            self.debug_btn.config(relief="raised")
 
     def give_output(self, i, type="output"):
         if isinstance(i, int):
@@ -478,29 +406,26 @@ class RunGUI:
             self.all_output.append((i, type))
         self.update_output()
 
-    def give_debug(self, t, level):
-        if level == 1:
-            self.give_output(t, type="waiting_typing")
-
-    def type_debug(self):
-        if self.runner.memory_changed:
+    def give_debug(self):
+        if any(m.state == runner.ValueState.written for m in self.runner.memory):
             t = "_write"
-        elif self.runner.memory_read:
+        elif any(m.state == runner.ValueState.read for m in self.runner.memory):
             t = "_read"
         elif self.runner.instruction_addr != self.runner.counter - 1:
             t = "_jump"
         else:
             t = "_other"
-        for i, (text, type) in enumerate(self.all_output):
-            if type == "waiting_typing":
-                self.all_output[i] = (text, "debug" + t)
+        self.all_output.append((self.runner.hint, "debug" + t))
 
     def update_output(self):
         self.output["state"] = "normal"
         self.output.delete("1.0", tkinter.END)
         for text, type in self.all_output:
             tag = type
-            out = lambda x: self.output.insert(tkinter.END, x + "\n", tag)
+
+            def out(x):
+                self.output.insert(tkinter.END, x + "\n", tag)
+
             if self.show_debug:
                 if not type.startswith("debug_"):
                     tag = "debug_" + type
@@ -555,7 +480,7 @@ class RunGUI:
     def setmem(self, addr, value):
         if self.run_to_halt or self.getting_inp:
             return False
-        self.runner.setmem(addr, value)
+        self.runner.memory[addr].write(value)
         self.set_colors()
         return True
 
@@ -564,39 +489,50 @@ class RunGUI:
         self.getting_inp = False
         self.all_output = []
         self.runner.reset()
-        self.update_memory()
+        self.set_colors()
         self.update_output()
 
-    def exit(self):
-        self.root.destroy()
+    def set_breakpoints(self, brps):
+        self.code_editor.breakpoints = brps
+        self.code_editor.breakpoints_changed()
+
+    def breakpoints_changed(self, brps):
+        self.runner.load_breakpoints(brps)
+        self.after(1, self.set_colors)
+
+    @property
+    def breakpoints_active(self):
+        return self._breakpoints_active
+
+    @breakpoints_active.setter
+    def breakpoints_active(self, value):
+        logger.info("Breakpoints active: {}", value)
+        self._breakpoints_active = value
+        self.breakpoints_active_var.set(value)
+        self.runner.breakpoints_active = value
+        self.code_editor.show_breakpoints(value)
+        self.update_memory()
+
+    def update_debug_from_vars(self):
+        self.breakpoints_active = self.breakpoints_active_var.get()
+        self.show_debug = self.debug_trace_var.get()
+        self.update_output()
+        self.update_debug_button()
+
+    def do_bindings(self):
+        pass
+
+    def do_unbindings(self):
+        pass
 
 if __name__ == "__main__":
-    import argparse
+    root = tkinter.Tk(className='ToolTip-demo')
+    t = RunMode(root)
+    t.grid(row=0, column=0, sticky=tkinter.NE + tkinter.SW)
 
-    arg_parser = argparse.ArgumentParser(description=__doc__.split("\n")[1],
-                                         epilog="""
-yaplmc Copyright (C) 2014  Matthew Joyce
-This program comes with ABSOLUTELY NO WARRANTY.
-This is free software, and you are welcome to redistribute it
-under certain conditions. Type `yaplmc --licence` for details.
-                                         """.strip())
-    arg_parser.add_argument("-f", "--file", help="lmc file",
-                            default=None)
-    arg_parser.add_argument("-l", "--licence", help="display licence",
-                            action="store_true")
-    arg_parser.add_argument("-V", "--version", help="display version",
-                            action="store_true")
-
-    args_from_parser = arg_parser.parse_args()
-
-    if args_from_parser.licence:
-        print(__doc__.strip())
-        exit()
-    elif args_from_parser.version:
-        print("yaplmc", __version__)
-        exit()
-    r = RunGUI()
-    a = AssembleGUI(args_from_parser.file, r.root)
-    if a.code:
-        r.set_code(a.code, a.fname)
-        tkinter.mainloop()
+    root.columnconfigure(0, weight=1)
+    root.rowconfigure(0, weight=1)
+    root["menu"] = t.menu
+    t.focus_set()
+    t.do_bindings()
+    root.mainloop()

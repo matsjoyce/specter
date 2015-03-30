@@ -1,0 +1,34 @@
+# WARNING: This is not considered good practice.
+# Stores inputted numbers until 0 is entered. Then outputs all inputted numbers.
+# This is an example of an LMC array, which should raise several assembler warnings.
+# Stores a maximum of ~80 values, due to memory size.
+
+START   INP
+ARSTA   STA ARRAY
+        BRZ ARLDA
+
+# Here's the important part. Load the STA instruction, increment it, then store it back.
+# This has the effect of incrementing the address it will store to.
+        LDA ARSTA
+        ADD ONE
+        STA ARSTA
+
+        BRA START
+
+ARLDA   LDA ARRAY
+        BRZ END
+        OUT
+
+# Same procedure as above.
+        LDA ARLDA
+        ADD ONE
+        STA ARLDA
+
+        BRA ARLDA
+
+END     HLT
+
+ONE     DAT 1
+
+# This is where the first value is stored.
+ARRAY   DAT
