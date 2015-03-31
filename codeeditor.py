@@ -416,6 +416,7 @@ class CodeEditor(tkinter.Frame):
         self.text.bind("<Control-d>", self.comment_line)
         self.text.bind("<Control-D>", self.decomment_line)
         self.text.bind("<Tab>", self.indent)
+        self.text.bind("<Shift-Tab>", self.deindent)
         self.text.bind("<ISO_Left_Tab>", self.deindent)
         self.text.set_insert_moved_callback(self.insert_moved)
 
