@@ -70,7 +70,7 @@ class ColoredFormatter(logging.Formatter):
                 line += colorise(", in ", WHITE) + colorise(function, YELLOW)
             yield line
             yield "    " + text
-        yield colorise(exc.__class__.__name__ + (": " if exc.args else ""), RED) + colorise(" ".join(exc.args), WHITE)
+        yield colorise(exc.__class__.__name__ + (": " if exc.args else ""), RED) + colorise(" ".join(map(str, exc.args)), WHITE)
 
     def format(self, record):
         color, letter, name, arrow = self.levels[record.levelno]

@@ -487,7 +487,7 @@ class CodeEditor(tkinter.Frame):
     def close(self, *discard):
         logger.info("Closing")
         if self.text.edit_modified():
-            self.logger.info("File has been modified and not saved")
+            logger.info("File has been modified and not saved")
             save = messagebox.askyesnocancel(title="Close file",
                                              message="File {} has unsaved changes. Save?".format(self.fname))
             if save is None:
@@ -495,7 +495,7 @@ class CodeEditor(tkinter.Frame):
             elif save is True:
                 self.save()
             else:
-                self.logger.warning("Changes not saved")
+                logger.warning("Changes not saved")
         return True
 
     def reload(self, *discard):

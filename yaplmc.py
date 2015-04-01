@@ -102,6 +102,7 @@ class GUIManager(tkinter.Tk):
         ce = self.code_mode.current_codeeditor()
         ce.breakpoints = self.run_mode.code_editor.breakpoints
         ce.update_sidebars()
+        ce.update_syntax()
         self.update_menu(self.code_mode.menus)
 
     def set_title(self, txt):
@@ -217,13 +218,14 @@ under certain conditions. Type `yaplmc --licence` for details.
         else:
             logger.info("Could not import inquisitor, disabling exception reporting")
     else:
-        exc_catcher = inquisitor.Inquisitor()
+        exc_catcher = inquisitor.Inquisitor(tracker_url="https://github.com/"
+                                            "matsjoyce/yaplmc/issues")
         log_col = inquisitor.collectors.LoggingCollector()
         log_col.setFormatter(log_formatter)
         exc_catcher.collectors.append(log_col)
         logger.addHandler(log_col)
         rh = inquisitor.utils.ReportManager("bug_info", "bug_info_{no}.xml",
-                                            max_files_size=inquisitor.utils.MiB)
+                                            max_files_size=5 * inquisitor.utils.MiB)
         xml_h = inquisitor.handlers.XMLFileDumpHandler(reportmanager=rh)
         log_h = inquisitor.handlers.LogTracebackHandler()
         exc_catcher.handlers = [xml_h, log_h]
@@ -233,7 +235,14 @@ under certain conditions. Type `yaplmc --licence` for details.
             tk_h = inquisitor.handlers.StreamMessageHandler()
             exc_catcher.handlers.append(tk_h)
         else:
-            tk_h = inquisitor.handlers.TkinterMessageHandler()
+            try:
+                import pudb
+            except:
+                logger.info("Could not import pudb, disabling debugging")
+                args = {}
+            else:
+                args = {"ask_start_db": True, "db_cmd": lambda ty, e, tb: pudb.post_mortem(tb, ty, e)}
+            tk_h = inquisitor.handlers.TkinterMessageHandler(**args)
             exc_catcher.handlers.append(tk_h)
         exc_catcher.enabled = args_from_parser.buginfo
 
