@@ -175,6 +175,9 @@ class Runner:
                          .format(addr, self.accumulator.value))
             self.memory[addr].write(self.accumulator.read())
 
+        elif instruction < 500:
+            raise RuntimeError("Invalid instruction {:03}".format(instruction))
+
         elif instruction < 600:  # LDA
             memval = self.memory[addr].read()
             self.hint = ("LDA {0:03}: load {1:03} (#{0:03}) to accumulator"
