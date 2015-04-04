@@ -43,7 +43,7 @@ logger.name = __name__
 
 
 class GUIManager(tkinter.Tk):
-    def __init__(self, exc_reporter):
+    def __init__(self, exc_reporter, files):
         super().__init__()
         self.title("yaplmc")
         self.columnconfigure(0, weight=1)
@@ -69,6 +69,8 @@ class GUIManager(tkinter.Tk):
         self.code_mode.grid(row=0, column=0, sticky=tkinter.NE + tkinter.SW)
         self.code_mode.do_bindings()
         self.code_mode.focus_set()
+        if files:
+            self.code_mode.open(files)
         self.update_menu(self.code_mode.menus)
 
     def update_menu(self, menus):
@@ -113,14 +115,17 @@ class GUIManager(tkinter.Tk):
 
 
 def main_gui(args_from_parser, exc_reporter):
-    t = GUIManager(exc_reporter)
+    t = GUIManager(exc_reporter, args_from_parser.file)
     t.mainloop()
     return 0
 
 
 def main_cli(args_from_parser, exc_reporter):
+    if len(args_from_parser.file) > 1:
+        print("Too many files")
+        return 1
     try:
-        with open(args_from_parser.file or input("Filename: ")) as f:
+        with open(args_from_parser.file[0] or input("Filename: ")) as f:
             code = f.read()
     except IOError as e:
         print("Could not open file:", e)
@@ -176,14 +181,14 @@ This is free software, and you are welcome to redistribute it
 under certain conditions. Type `yaplmc --licence` for details.
                                          """.strip())
 
-    arg_parser.add_argument("-f", "--file", help="lmc file",
-                            default=None)
+    arg_parser.add_argument("file", nargs="*", help="lmc file",
+                            default=[])
     arg_parser.add_argument("-l", "--licence", help="display licence",
                             action="store_true")
     arg_parser.add_argument("-V", "--version", version="yaplmc " + __version__,
                             action="version")
     arg_parser.add_argument("-b", "--buginfo", help="generate information"
-                            " about any crashed", action="store_true")
+                            " about any unhandled exceptions", action="store_true")
 
     cli_group = arg_parser.add_argument_group("CLI options (all options only"
                                               " active when -c or --cli used)")

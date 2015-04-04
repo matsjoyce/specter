@@ -21,7 +21,6 @@ logging.setLogRecordFactory(log_record_factory)
 
 
 BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(30, 38)
-exc_file_line_re = re.compile("  File (?P<file>\".*?\"), line (?P<line>\d+)(, in (?P<function>[\w<>]+))?")
 color_re = re.compile("\033\[1;\\d*?m")
 
 
@@ -70,7 +69,8 @@ class ColoredFormatter(logging.Formatter):
                 line += colorise(", in ", WHITE) + colorise(function, YELLOW)
             yield line
             yield "    " + text
-        yield colorise(exc.__class__.__name__ + (": " if exc.args else ""), RED) + colorise(" ".join(map(str, exc.args)), WHITE)
+        yield (colorise(exc.__class__.__name__ + (": " if exc.args else ""), RED)
+               + colorise(" ".join(map(str, exc.args)), WHITE))
 
     def format(self, record):
         color, letter, name, arrow = self.levels[record.levelno]

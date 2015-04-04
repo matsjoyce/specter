@@ -79,8 +79,8 @@ class DebugCodeEditor(codeeditor.CodeEditor):
                     continue
                 lineno = val.token.position.lineno + 1
                 self.text.tag_add("state_" + val.state.value,
-                                str(lineno) + ".0",
-                                str(lineno + 1) + ".0")
+                                  str(lineno) + ".0",
+                                  str(lineno + 1) + ".0")
         self.text["state"] = "disabled"
 
     def make_tooltip(self, token):
