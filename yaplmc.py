@@ -17,289 +17,158 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import tkinter
+from tkinter import (filedialog as fdialog, scrolledtext as stext,
+                     simpledialog, font as tkfont)
+import logging
+import sys
+
+import assembler
+import runner
+import codemode
+import runmode
+import colored_logger
+
 __author__ = "Matthew Joyce"
 __copyright__ = "Copyright 2013"
 __credits__ = ["Matthew Joyce"]
 __license__ = "GPL3"
-__version__ = "1.1.0"
+__version__ = "1.2.0 Alpha"
 __maintainer__ = "Matthew Joyce"
 __email__ = "matsjoyce@gmail.com"
 __status__ = "Development"
 
-instructions = {"ADD": "1xx",
-                "SUB": "2xx",
-                "STA": "3xx",
-                "LDA": "5xx",
-                "BRA": "6xx",
-                "BRZ": "7xx",
-                "BRP": "8xx",
-                "INP": "901",
-                "OUT": "902",
-                "HLT": "000",
-                "DAT": None
-                }
+logger = logging.getLogger()
+logger.name = __name__
 
 
-def add_arg(memo, arg, lineno, line):
-    instr = instructions[memo]
-    if arg:
-        if len(arg) > 2 or not arg.isdigit():
-            raise SyntaxError("Bad argument on line {}: '{}'"
-                              .format(lineno + 1, arg))
-    if arg:
-        arg = arg.zfill(2)
-    if "xx" in instr:
-        if not arg:
-            raise SyntaxError("Instruction on line {} "
-                              "takes an argument: '{}'".format(lineno + 1,
-                                                               memo))
-        return instr.replace("xx", arg)
-    if arg:
-        raise SyntaxError("Instruction on line {} "
-                          "has no argument: '{}'".format(lineno + 1, memo))
-    return instr
+class GUIManager(tkinter.Tk):
+    def __init__(self, exc_reporter, files):
+        super().__init__()
+        self.title("yaplmc")
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+
+        self.menu = tkinter.Menu(self)
+        self["menu"] = self.menu
+
+        self.settings_menu = tkinter.Menu(self.menu, tearoff=False)
+        self.exc_reporter = exc_reporter
+        self.exc_reporting_var = tkinter.BooleanVar()
+        self.exc_reporting_var.set(exc_reporter.enabled
+                                   if exc_reporter else False)
+        er_state = "disabled" if exc_reporter is None else "active"
+        self.settings_menu.add_checkbutton(label="Exception reporting",
+                                           variable=self.exc_reporting_var,
+                                           command=self.update_exc_reporting,
+                                           state=er_state)
+
+        self.code_mode = codemode.CodeMode(self)
+        self.run_mode = runmode.RunMode(self)
+
+        self.code_mode.grid(row=0, column=0, sticky=tkinter.NE + tkinter.SW)
+        self.code_mode.do_bindings()
+        self.code_mode.focus_set()
+        if files:
+            self.code_mode.open(files)
+        self.update_menu(self.code_mode.menus)
+
+    def update_menu(self, menus):
+        end = self.menu.index(tkinter.END)
+        for opts in menus:
+            self.menu.add_cascade(**opts)
+        self.menu.add_cascade(label="Settings", menu=self.settings_menu)
+        self.menu.delete(0, end)
+
+    def runmode(self, *discard):
+        self.code_mode.grid_forget()
+        self.code_mode.do_unbindings()
+
+        self.run_mode.grid(row=0, column=0, sticky=tkinter.NE + tkinter.SW)
+        self.run_mode.do_bindings()
+        self.run_mode.focus_set()
+        self.update_menu(self.run_mode.menus)
+
+        ce = self.code_mode.current_codeeditor()
+        self.run_mode.set_code(ce.assembler, ce.fname)
+        self.run_mode.set_breakpoints(self.code_mode.current_codeeditor().breakpoints)
+        self.run_mode.reset()
+
+    def codemode(self, *discard):
+        self.run_mode.grid_forget()
+        self.run_mode.do_unbindings()
+
+        self.code_mode.grid(row=0, column=0, sticky=tkinter.NE + tkinter.SW)
+        self.code_mode.do_bindings()
+        self.code_mode.focus_set()
+        ce = self.code_mode.current_codeeditor()
+        ce.breakpoints = self.run_mode.code_editor.breakpoints
+        ce.update_sidebars()
+        ce.update_syntax()
+        self.update_menu(self.code_mode.menus)
+
+    def set_title(self, txt):
+        self.title("yaplmc - " + txt)
+
+    def update_exc_reporting(self):
+        self.exc_reporter.enabled = self.exc_reporting_var.get()
 
 
-def assemble(lines):
-    labels = {}
-    instrs = []
-    # Turn list of lines into list of (instruction, argument)
-    i = 0
-    for lineno, origline in enumerate(lines):
-        line = origline
-        if "#" in line:
-            line = line[:line.find("#")]
-        line = line.strip()
-        if not line:
-            continue
-        line = line.split()
-        if len(line) == 3:
-            label, instr, arg = line
-        elif len(line) == 2:
-            if line[0] in instructions:
-                instr, arg = line
-                label = None
-            else:
-                label, instr = line
-                arg = None
-        elif len(line) == 1:
-            instr = line[0]
-            label = arg = None
-        else:
-            raise SyntaxError("Invalid line {}: '{}'".format(lineno + 1,
-                                                             origline))
-        instr = instr.upper()
-        if instr not in instructions:
-            raise SyntaxError("Invalid mnemonic at line {}:"
-                              " '{}'".format(lineno + 1, instr))
-        if label:
-            if label in labels:
-                orig_line = instrs[labels[label]][3] + 1
-                raise SyntaxError("Duplicate label '{}' "
-                                  "on lines {} and {}".format(label,
-                                                              lineno + 1,
-                                                              orig_line))
-            labels[label] = i
-        instrs.append((instr, arg, origline, lineno))
-        i += 1
-    # resolve arguments and assemble
-    assembled = []
-    for instr, arg, line, lineno in instrs:
-        if instr == "DAT":
-            if arg:
-                if set(arg) - set("1234567890-") \
-                   or int(arg) not in range(-500, 500):
-                    raise SyntaxError("Bad argument on line {}: '{}'"
-                                      .format(lineno + 1, arg))
-                i = int(arg)
-                arg = 1000 + i if i < 0 else i
-            else:
-                arg = 0
-            assembled.append(arg)
-        else:
-            if arg in labels:
-                arg = str(labels[arg])
-            assembled.append(int(add_arg(instr, arg, lineno, line)))
-    l = len(assembled)
-    if l > 100:
-        raise RuntimeError("Code is too large")
-    while len(assembled) != 100:
-        assembled.append(0)
-    return assembled, l
-
-DEBUG_LEVEL_NONE = 0
-DEBUG_LEVEL_LOW = 1
-DEBUG_LEVEL_MEDIUM = 2
-DEBUG_LEVEL_HIGH = 3
-
-HALT_REASON_HLT = 0
-HALT_REASON_INP = 1
-HALT_REASON_STEP = 2
+def main_gui(args_from_parser, exc_reporter):
+    t = GUIManager(exc_reporter, args_from_parser.file)
+    t.mainloop()
+    return 0
 
 
-class Runner:
-    def __init__(self, program, get_input=None, halt_for_inp=False,
-                 give_output=None, debug_output=None,
-                 unfiltered_debug_output=None, debug_level=0):
-        self.code = program
-        self.get_input = get_input if get_input else self._get_input
-        self.give_output = give_output if give_output else self._give_output
-        self.halt_for_inp = halt_for_inp
-        self.debug_level = debug_level
-        self.debug_output = unfiltered_debug_output or self.filter_debug_output
-        self.fdebug_output = debug_output or self._debug_output
-        self.reset()
+def main_cli(args_from_parser, exc_reporter):
+    if len(args_from_parser.file) > 1:
+        print("Too many files")
+        return 1
+    try:
+        with open(args_from_parser.file[0] or input("Filename: ")) as f:
+            code = f.read()
+    except IOError as e:
+        print("Could not open file:", e)
+        return 1
+    print("Assembling...")
+    assem = assembler.Assembler()
+    assem.update_code(code)
+    assem.assemble()
+    if assem.problems:
+        print("\n".join(i.show(code.splitlines()) for i in assem.problems))
+    if assem.in_error:
+        print("Assembly failed")
+        return 1
+    print("Assembly succeeded")
+    machine_code, code_length = (assem.machine_code,
+                                 assem.machine_code_length)
+    if args_from_parser.debug:
+        print("Code:")
+        print(" ".join(map(str, machine_code[:code_length])))
+    print("Loading code...")
+    run = runner.Runner(lambda x: print(">>>", x))
+    run.load_code(assem)
+    print("Running...")
+    while run.halt_reason != runner.HaltReason.hlt:
+        if args_from_parser.debug >= 2:
+            print("Memory:")
+            print(*[i.value for i in run.memory])
+            print("Executing instruction {:03} at {:03}".format(run.memory[run.counter].value, run.counter))
+        try:
+            run.next_step()
+        except RuntimeError as e:
+            print("Error", e.args[0])
+        except (KeyboardInterrupt, EOFError):
+            break
+        if run.halt_reason == runner.HaltReason.input:
+            try:
+                run.give_input(int(input("<<< ")))
+            except (KeyboardInterrupt, EOFError):
+                break
+        if args_from_parser.debug >= 1:
+            print(run.hint)
+    return 0
 
-    def filter_debug_output(self, msg, level):
-        if level <= self.debug_level:
-            self.fdebug_output(msg)
-
-    def cap(self, i):
-        return (i + 1000) % 1000
-
-    def int_to_complement(self, i):
-        return 1000 + i if i < 0 else i
-
-    def int_from_complement(self, i):
-        return i - 1000 if i >= 500 else i
-
-    def _get_input(self):
-        return int(input("<<< "))
-
-    def _give_output(self, i):
-        print(">>>", i)
-
-    def _debug_output(self, i):
-        print(i)
-
-    def give_input(self, i):
-        self.setaccum(self.cap(i))
-
-    # Below functions are to be used inside next_step, to keep track
-    # of what has been read and written
-
-    def readaccum(self):
-        self.accumulator_read = True
-        return self.accumulator
-
-    def setaccum(self, value):
-        self.accumulator = self.cap(value)
-        self.accumulator_changed = True
-
-    def readmem(self, addr):
-        self.memory_read.add(addr)
-        return self.memory[addr]
-
-    def setmem(self, addr, value):
-        self.memory[addr] = self.cap(value)
-        self.memory_changed.add(addr)
-
-    def next_step(self):
-        self.accumulator_read = False
-        self.accumulator_changed = False
-        self.memory_changed = set()
-        self.memory_read = set()
-        self.debug_output("Executing next instruction"
-                          " at {:03}".format(self.counter), DEBUG_LEVEL_HIGH)
-        instruction = self.memory[self.counter]
-        self.debug_output("Next instruction is {:03}".format(instruction),
-                          DEBUG_LEVEL_MEDIUM)
-        memory_str = ", ".join("{}: {:03}".format(i, self.memory[i])
-                               for i in range(100))
-        self.debug_output("Memory: {}".format(memory_str), DEBUG_LEVEL_MEDIUM)
-        self.debug_output("Accumulator: {}".format(self.accumulator),
-                          DEBUG_LEVEL_MEDIUM)
-        self.debug_output("Counter: {}".format(self.counter),
-                          DEBUG_LEVEL_MEDIUM)
-        self.instruction_addr = self.counter
-        self.counter += 1
-        self.debug_output("Incrementing counter to {}".format(self.counter),
-                          DEBUG_LEVEL_HIGH)
-        addr = instruction % 100
-        if instruction == 0:  # HLT
-            self.debug_output("HLT", DEBUG_LEVEL_LOW)
-            self.give_output("Done!")
-            return HALT_REASON_HLT
-        elif instruction < 100:
-            raise RuntimeError("Invalid instruction {:03}".format(instruction))
-        elif instruction < 200:  # ADD
-            memval = self.readmem(addr)
-            value = self.cap(self.readaccum() + memval)
-            self.debug_output("ADD {0:03}: accumulator = {1:03}"
-                              " (accumulator) + {2:03} (#{0:03}) = {3:03}"
-                              .format(addr, self.readaccum(),
-                                      memval, value),
-                              DEBUG_LEVEL_LOW)
-            self.setaccum(value)
-        elif instruction < 300:  # SUB
-            memval = self.readmem(addr)
-            value = self.cap(self.readaccum() - memval)
-            self.debug_output("SUB {0:03}: accumulator = {1:03} (accumulator)"
-                              " - {2:03} (#{0:03}) = {3:03}"
-                              .format(addr, self.readaccum(),
-                                      memval, value),
-                              DEBUG_LEVEL_LOW)
-            self.setaccum(value)
-        elif instruction < 400:  # STA
-            self.debug_output("STA {0:03}: store {1:03} (accumulator)"
-                              " to #{0:03}"
-                              .format(addr, self.readaccum()), DEBUG_LEVEL_LOW)
-            self.setmem(addr, self.readaccum())
-        elif instruction < 600:  # LDA
-            memval = self.readmem(addr)
-            self.debug_output("LDA {0:03}: load {1:03} (#{0:03}) to "
-                              "accumulator"
-                              .format(addr, memval),
-                              DEBUG_LEVEL_LOW)
-            self.setaccum(memval)
-        elif instruction < 700:  # BRA
-            self.debug_output("BRA {0:03}: branch to #{0:03}".format(addr),
-                              DEBUG_LEVEL_LOW)
-            self.counter = addr
-        elif instruction < 800:  # BRZ
-            words = ("==", "") if self.readaccum() == 0 else ("!=", " don't")
-            self.debug_output("BRZ {0:03}: {1:03} (accumulator) {2} 000,"
-                              " so{3} branch to #{0:03}"
-                              .format(addr, self.readaccum(), *words),
-                              DEBUG_LEVEL_LOW)
-            if self.readaccum() == 0:
-                self.counter = addr
-        elif instruction < 900:  # BRP
-            words = ("<", "") if self.readaccum() < 500 else (">=", " don't")
-            self.debug_output("BRP {0:03}: {1:03} (accumulator) {2} 500,"
-                              " so{3} branch to #{0:03}"
-                              .format(addr, self.readaccum(), *words),
-                              DEBUG_LEVEL_LOW)
-            if self.readaccum() < 500:
-                self.counter = addr
-        elif instruction == 901:  # INP
-            self.debug_output("INP", DEBUG_LEVEL_LOW)
-            if self.halt_for_inp:
-                return HALT_REASON_INP
-            else:
-                i = self.int_to_complement(self.get_input())
-                self.setaccum(self.cap(i))
-        elif instruction == 902:  # OUT
-            self.debug_output("OUT", DEBUG_LEVEL_LOW)
-            self.give_output(self.int_from_complement(self.readaccum()))
-        else:
-            raise RuntimeError("Invalid instruction {:03}".format(instruction))
-        return HALT_REASON_STEP
-
-    def run_to_hlt(self):
-        r = HALT_REASON_STEP
-        while r == HALT_REASON_STEP:
-            r = self.next_step()
-        return r
-
-    def reset(self):
-        self.counter = self.instruction_addr = 0
-        self.accumulator = 0
-        self.memory = self.code.copy()
-        self.accumulator_read = False
-        self.accumulator_changed = False
-        self.memory_changed = set()
-        self.memory_read = set()
 
 if __name__ == "__main__":
     import argparse
@@ -311,43 +180,78 @@ This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions. Type `yaplmc --licence` for details.
                                          """.strip())
-    arg_parser.add_argument("-d", "--debug", help="debug level"
-                            " (repeat for more info, 3 is the max)",
-                            action="count", default=0)
-    arg_parser.add_argument("-f", "--file", help="lmc file",
-                            default=None)
+
+    arg_parser.add_argument("file", nargs="*", help="lmc file",
+                            default=[])
     arg_parser.add_argument("-l", "--licence", help="display licence",
                             action="store_true")
-    arg_parser.add_argument("-V", "--version", help="display version",
-                            action="store_true")
+    arg_parser.add_argument("-V", "--version", version="yaplmc " + __version__,
+                            action="version")
+    arg_parser.add_argument("-b", "--buginfo", help="generate information"
+                            " about any unhandled exceptions", action="store_true")
+
+    cli_group = arg_parser.add_argument_group("CLI options (all options only"
+                                              " active when -c or --cli used)")
+    cli_group.add_argument("-c", "--cli", help="use CLI mode",
+                           action="store_true")
+    cli_group.add_argument("-d", "--debug", help="debug level"
+                           " (repeat for more info, 3 is the max)",
+                           action="count", default=0)
 
     args_from_parser = arg_parser.parse_args()
 
     if args_from_parser.licence:
         print(__doc__.strip())
-        exit()
-    elif args_from_parser.version:
-        print("yaplmc", __version__)
-        exit()
 
-    if args_from_parser.file:
-        code = open(args_from_parser.file).read().split("\n")
+    logger.setLevel(logging.DEBUG)
+
+    log_formatter = colored_logger.ColoredFormatter()
+
+    stream_hndlr = logging.StreamHandler(sys.stdout)
+    stream_hndlr.setFormatter(log_formatter)
+    stream_hndlr.setLevel(logging.CRITICAL if args_from_parser.cli else logging.INFO)
+    logger.addHandler(stream_hndlr)
+
+    try:
+        import inquisitor
+    except:
+        exc_catcher = None
+        if args_from_parser.buginfo:
+            print("Could not import inquisitor. Please make sure"
+                  " it has been installed to the correct Python environment.")
+            exit(1)
+        else:
+            logger.info("Could not import inquisitor, disabling exception reporting")
     else:
-        code = open(input("Filename: ")).read().split("\n")
-    print("Assembling...")
-    try:
-        machine_code, code_length = assemble(code)
-    except SyntaxError as e:
-        print("Assembly failed")
-        print("Error:", e.args[0])
-        exit(1)
-    print("Assembly successful")
-    if args_from_parser.debug:
-        print("Code:")
-        print(" ".join(map(str, machine_code[:code_length])))
-    print("Running...")
-    runner = Runner(machine_code, debug_level=args_from_parser.debug)
-    try:
-        runner.run_to_hlt()
-    except RuntimeError as e:
-        print("Error:", e.args[0])
+        exc_catcher = inquisitor.Inquisitor(tracker_url="https://github.com/"
+                                            "matsjoyce/yaplmc/issues")
+        log_col = inquisitor.collectors.LoggingCollector()
+        log_col.setFormatter(log_formatter)
+        exc_catcher.collectors.append(log_col)
+        logger.addHandler(log_col)
+        rh = inquisitor.utils.ReportManager("bug_info", "bug_info_{no}.xml",
+                                            max_files_size=5 * inquisitor.utils.MiB)
+        xml_h = inquisitor.handlers.XMLFileDumpHandler(reportmanager=rh)
+        log_h = inquisitor.handlers.LogTracebackHandler()
+        exc_catcher.handlers = [xml_h, log_h]
+        exc_catcher.watch_sys_excepthook()
+        exc_catcher.watch_tkinter_report_callback_exception()
+        if args_from_parser.cli:
+            tk_h = inquisitor.handlers.StreamMessageHandler()
+            exc_catcher.handlers.append(tk_h)
+        else:
+            try:
+                import pudb
+            except:
+                logger.info("Could not import pudb, disabling debugging")
+                args = {}
+            else:
+                args = {"ask_start_db": True, "db_cmd": lambda ty, e, tb: pudb.post_mortem(tb, ty, e)}
+            tk_h = inquisitor.handlers.TkinterMessageHandler(**args)
+            exc_catcher.handlers.append(tk_h)
+        exc_catcher.enabled = args_from_parser.buginfo
+
+    if args_from_parser.cli:
+        exit(main_cli(args_from_parser, exc_catcher))
+    else:
+        exit(main_gui(args_from_parser, exc_catcher))
