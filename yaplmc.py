@@ -187,8 +187,8 @@ under certain conditions. Type `yaplmc --licence` for details.
                             action="store_true")
     arg_parser.add_argument("-V", "--version", version="yaplmc " + __version__,
                             action="version")
-    arg_parser.add_argument("-b", "--buginfo", help="generate information"
-                            " about any unhandled exceptions", action="store_true")
+    arg_parser.add_argument("-n", "--nobuginfo", help="generate information"
+                            " about any unhandled exceptions", action="store_false")
 
     cli_group = arg_parser.add_argument_group("CLI options (all options only"
                                               " active when -c or --cli used)")
@@ -216,7 +216,7 @@ under certain conditions. Type `yaplmc --licence` for details.
         import inquisitor
     except:
         exc_catcher = None
-        if args_from_parser.buginfo:
+        if args_from_parser.nobuginfo:
             print("Could not import inquisitor. Please make sure"
                   " it has been installed to the correct Python environment.")
             exit(1)
@@ -249,7 +249,7 @@ under certain conditions. Type `yaplmc --licence` for details.
                 args = {"ask_start_db": True, "db_cmd": lambda ty, e, tb: pudb.post_mortem(tb, ty, e)}
             tk_h = inquisitor.handlers.TkinterMessageHandler(**args)
             exc_catcher.handlers.append(tk_h)
-        exc_catcher.enabled = args_from_parser.buginfo
+        exc_catcher.enabled = args_from_parser.nobuginfo
 
     if args_from_parser.cli:
         exit(main_cli(args_from_parser, exc_catcher))
