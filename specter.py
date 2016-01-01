@@ -45,7 +45,7 @@ logger.name = __name__
 class GUIManager(tkinter.Tk):
     def __init__(self, exc_reporter, files):
         super().__init__()
-        self.title("yaplmc")
+        self.title("specter")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
@@ -108,7 +108,7 @@ class GUIManager(tkinter.Tk):
         self.update_menu(self.code_mode.menus)
 
     def set_title(self, txt):
-        self.title("yaplmc - " + txt)
+        self.title("specter - " + txt)
 
     def update_exc_reporting(self):
         self.exc_reporter.enabled = self.exc_reporting_var.get()
@@ -175,17 +175,17 @@ if __name__ == "__main__":
 
     arg_parser = argparse.ArgumentParser(description=__doc__.split("\n")[1],
                                          epilog="""
-yaplmc Copyright (C) 2014  Matthew Joyce
+specter Copyright (C) 2014  Matthew Joyce
 This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
-under certain conditions. Type `yaplmc --licence` for details.
+under certain conditions. Type `specter --licence` for details.
                                          """.strip())
 
     arg_parser.add_argument("file", nargs="*", help="lmc file",
                             default=[])
     arg_parser.add_argument("-l", "--licence", help="display licence",
                             action="store_true")
-    arg_parser.add_argument("-V", "--version", version="yaplmc " + __version__,
+    arg_parser.add_argument("-V", "--version", version="specter " + __version__,
                             action="version")
     arg_parser.add_argument("-n", "--nobuginfo", help="generate information"
                             " about any unhandled exceptions", action="store_false")
@@ -224,7 +224,7 @@ under certain conditions. Type `yaplmc --licence` for details.
             logger.info("Could not import inquisitor, disabling exception reporting")
     else:
         exc_catcher = inquisitor.Inquisitor(tracker_url="https://github.com/"
-                                            "matsjoyce/yaplmc/issues")
+                                            "matsjoyce/specter/issues")
         log_col = inquisitor.collectors.LoggingCollector()
         log_col.setFormatter(log_formatter)
         exc_catcher.collectors.append(log_col)

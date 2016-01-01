@@ -1,7 +1,7 @@
-yaplmc
-=====
+specter
+=======
 
-Yet Another Python Little Man Computer written in Python 3
+SimPlE CompuTER - A Little Man Computer written in Python 3
 
 Usage
 =====
@@ -9,26 +9,26 @@ Usage
 Command Line
 ------------
 
- - `./yaplmc.py`
+ - `./specter.py -c`
  - Type in filename (or use `-f` command line flag)
  - Have fun!
 
 GUI
 ---
 
- - `./yaplmc_gui.py`
+ - `./specter.py`
  - Select file
  - Press `Run`
  - Press `Run to Halt`
  - Have fun!
- - When the `input` field is "selected", type in a integer value between `-500` and `499` and press `Submit`.
+ - When the `input` field is "selected", type in a integer value between `-500` and `499` and press `Submit` or press Enter.
 
-![](https://github.com/matsjoyce/yaplmc/blob/master/screenshots/screenshot4.png)
+![](https://github.com/matsjoyce/specter/blob/master/screenshots/screenshot4.png)
 
 Examples
 ========
 
-Included examples (in the `examples` folder), sorted by subjective, relative measure:
+Included examples (in the `examples` folder), sorted by relative complexity into three catagories:
 
  - Easy
    - `add.lmc` - Add two numbers
@@ -41,21 +41,21 @@ Included examples (in the `examples` folder), sorted by subjective, relative mea
    - `multiply.lmc` - Multiply two numbers
    - `square.lmc` - Squares input until input == 0
  - Hard
-   - `fib.lmc` - Little man's fibonacci, a traditional challenge
+   - `fib.lmc` - Little man's Fibonacci, a traditional challenge
    - `test.lmc` - A self-test
 
 Advanced Usage
 ==============
 
-See the [wiki](https://github.com/matsjoyce/yaplmc/wiki) for documentation, [issues](https://github.com/matsjoyce/yaplmc/issues) for bug reporting / feature requests and [pull requests](https://github.com/matsjoyce/yaplmc/pulls) for contributing code.
+See the [wiki](https://github.com/matsjoyce/specter/wiki) for documentation, [issues](https://github.com/matsjoyce/specter/issues) for bug reporting / feature requests and [pull requests](https://github.com/matsjoyce/specter/pulls) for contributing code.
 
 Licence
 =======
 
-[GPL 3](https://github.com/matsjoyce/yaplmc/blob/master/LICENSE.md) or later
+[GPL 3](https://github.com/matsjoyce/specter/blob/master/LICENSE.md) or later
 
 More Information
 ===============
 
- - https://en.wikipedia.org/wiki/Little_man_computer - `yaplmc` follows the instruction set as far as possible
- - https://github.com/matsjoyce/yaplmc/wiki - documentation
+ - https://en.wikipedia.org/wiki/Little_man_computer - `specter` follows the instruction set as far as possible
+ - https://github.com/matsjoyce/specter/wiki - documentation
